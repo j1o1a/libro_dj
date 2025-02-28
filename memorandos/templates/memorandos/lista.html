@@ -1,0 +1,77 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% block content %}
+<div class="card shadow mt-4">
+    <div class="card-body">
+        <h2>Lista de Memorandos</h2>
+        <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#crearModal">Agregar Memorando</button>
+        <!-- Aquí iría la tabla de memorandos -->
+    </div>
+</div>
+
+<!-- Modal para Nuevo Memorando -->
+<div class="modal fade" id="crearModal" tabindex="-1" aria-labelledby="crearModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="crearModalLabel">Nuevo Memorando</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="memorandoForm" method="post" action="{% url 'memorandos:crear' %}">
+                    {% csrf_token %}
+                    {{ form.as_p }}
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de confirmación (opcional) -->
+<div class="modal fade" id="numeroModal" tabindex="-1" aria-labelledby="numeroModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="numeroModalLabel">Registro Exitoso</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>El memorando ha sido registrado con el número: <strong id="numeroAsignado"></strong></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal" onclick="location.reload();">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+$(document).ready(function() {
+    $("#id_destinatario").autocomplete({
+        source: ["Destinatario1", "Destinatario2", "Destinatario3"]  // Reemplaza con lista dinámica en producción
+    });
+
+    $("#memorandoForm").on("submit", function(e) {
+        e.preventDefault();
+        $.ajax({
+            url: $(this).attr("action"),
+            type: "POST",
+            data: $(this).serialize(),
+            headers: {"X-Requested-With": "XMLHttpRequest"},
+            success: function(response) {
+                if (response.success) {
+                    $("#crearModal").modal("hide");
+                    $("#numeroAsignado").text(response.numero);
+                    $("#numeroModal").modal("show");
+                }
+            },
+            error: function() {
+                alert("Ocurrió un error al guardar el memorando.");
+            }
+        });
+    });
+});
+</script>
+{% endblock %}
