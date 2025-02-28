@@ -6,7 +6,7 @@ from datetime import datetime
 
 @login_required
 def memorandos_lista(request):
-    from destinatarios.models import Destinatario  # Importamos aquí
+    from destinatarios.models import Destinatario  # Importación dentro de la función
     mostrar = request.GET.get('mostrar', 10)
     if mostrar == 'Todos':
         memorandos = Memorando.objects.all()

@@ -1,4 +1,5 @@
-from django.contrib import admin
-from .models import Destinatario
+from django.apps import AppConfig
 
-admin.site.register(Destinatario)
+class DestinatariosConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'destinatarios'

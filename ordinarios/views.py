@@ -6,7 +6,7 @@ from datetime import datetime
 
 @login_required
 def ordinarios_lista(request):
-    from destinatarios.models import Destinatario  # Importamos aquí
+    from destinatarios.models import Destinatario  # Importación dentro de la función
     mostrar = request.GET.get('mostrar', 10)
     if mostrar == 'Todos':
         ordinarios = Ordinario.objects.all()
