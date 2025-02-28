@@ -1,0 +1,19 @@
+[
+    {"model": "destinatarios.destinatario", "pk": 1, "fields": {"nombre": "Alcalde"}},
+    {"model": "destinatarios.destinatario", "pk": 2, "fields": {"nombre": "Secretaría Municipal"}},
+    {"model": "destinatarios.destinatario", "pk": 3, "fields": {"nombre": "Secretaría Comunal de Planificación"}},
+    {"model": "destinatarios.destinatario", "pk": 4, "fields": {"nombre": "Dirección de Desarrollo Comunitario y Social"}},
+    {"model": "destinatarios.destinatario", "pk": 5, "fields": {"nombre": "Dirección de Administración y Finanzas"}},
+    {"model": "destinatarios.destinatario", "pk": 6, "fields": {"nombre": "Dirección de Control"}},
+    {"model": "destinatarios.destinatario", "pk": 7, "fields": {"nombre": "Dirección de Comunicaciones"}},
+    {"model": "destinatarios.destinatario", "pk": 8, "fields": {"nombre": "Dirección de Obras Municipales"}},
+    {"model": "destinatarios.destinatario", "pk": 9, "fields": {"nombre": "Dirección de Medio Ambiente, Aseo, Ornato y Operaciones"}},
+    {"model": "destinatarios.destinatario", "pk": 10, "fields": {"nombre": "Dirección de Tecnologías de la Información"}},
+    {"model": "destinatarios.destinatario", "pk": 11, "fields": {"nombre": "Dirección de Tránsito y Transporte Público"}},
+    {"model": "destinatarios.destinatario", "pk": 12, "fields": {"nombre": "Dirección de Seguridad Ciudadana, Fiscalización, Emergencia Comunal"}},
+    {"model": "destinatarios.destinatario", "pk": 13, "fields": {"nombre": "Dirección de Servicios Generales"}},
+    {"model": "destinatarios.destinatario", "pk": 14, "fields": {"nombre": "Dirección de Sostenibilidad"}},
+    {"model": "destinatarios.destinatario", "pk": 15, "fields": {"nombre": "1.er Juzgado de Policía Local"}},
+    {"model": "destinatarios.destinatario", "pk": 16, "fields": {"nombre": "2.° Juzgado de Policía Local"}},
+    {"model": "destinatarios.destinatario", "pk": 17, "fields": {"nombre": "3.er Juzgado de Policía Local"}}
+]

@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'memorandos',
     'auditoria',
     'destinatarios',
+    'ajustes',
 ]
 
 MIDDLEWARE = [

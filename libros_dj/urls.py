@@ -7,4 +7,5 @@ urlpatterns = [
     path('', CustomLoginView.as_view(), name='login'),
     path('ordinarios/', include('ordinarios.urls')),
     path('memorandos/', include('memorandos.urls')),
+    path('ajustes/', include('ajustes.urls')), 
 ]
