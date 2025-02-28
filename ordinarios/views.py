@@ -6,26 +6,32 @@ from datetime import datetime
 
 @login_required
 def ordinarios_lista(request):
+    from destinatarios.models import Destinatario  # Importamos aquí
     mostrar = request.GET.get('mostrar', 10)
     if mostrar == 'Todos':
         ordinarios = Ordinario.objects.all()
     else:
         ordinarios = Ordinario.objects.all()[:int(mostrar)]
     fecha_actual = datetime.now().strftime('%Y-%m-%d')
-    return render(request, 'ordinarios/lista.html', {'ordinarios': ordinarios, 'fecha_actual': fecha_actual})
+    destinatarios_predefinidos = Destinatario.objects.all()
+    return render(request, 'ordinarios/lista.html', {
+        'ordinarios': ordinarios,
+        'fecha_actual': fecha_actual,
+        'destinatarios_predefinidos': destinatarios_predefinidos
+    })
 
 @login_required
 def ordinarios_agregar(request):
     if request.method == 'POST':
         data = request.POST
-        # Si no hay fecha en el POST, usamos la fecha actual
-        fecha = data.get('fecha')
-        if not fecha:  # Si está vacía o no se envió
-            fecha = datetime.now().date()  # Usamos .date() para coincidir con DateField
+        fecha = data.get('fecha') or datetime.now().date()
+        destinatario_select = data.get('destinatario_select')
+        destinatario_custom = data.get('destinatario_custom', '').strip()
+        destinatario = destinatario_custom if destinatario_select == "Otro" and destinatario_custom else destinatario_select
         ordinario = Ordinario(
             fecha=fecha,
             iddoc=data['iddoc'],
-            destinatario=data['destinatario'],
+            destinatario=destinatario,
             materia=data['materia'],
             autor=request.user.username[:10]
         )

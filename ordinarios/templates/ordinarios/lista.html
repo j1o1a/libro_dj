@@ -45,9 +45,52 @@
                     <h5 class="modal-title" id="agregarModalLabel">Agregar Nuevo Ordinario</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                {% include 'ordinarios/form.html' %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="fecha" class="form-label">Fecha</label>
+                        <input type="date" name="fecha" id="fecha" class="form-control" value="{{ fecha_actual }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="iddoc" class="form-label">IDDOC</label>
+                        <input type="number" name="iddoc" id="iddoc" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="destinatario_select" class="form-label">Destinatario</label>
+                        <select name="destinatario_select" id="destinatario_select" class="form-select" required>
+                            <option value="" disabled selected>Seleccione un destinatario</option>
+                            {% for destinatario in destinatarios_predefinidos %}
+                            <option value="{{ destinatario.nombre }}">{{ destinatario.nombre }}</option>
+                            {% endfor %}
+                            <option value="Otro">Otro</option>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="destinatario_custom_div" style="display: none;">
+                        <label for="destinatario_custom" class="form-label">Especifique otro destinatario</label>
+                        <input type="text" name="destinatario_custom" id="destinatario_custom" class="form-control" maxlength="100">
+                    </div>
+                    <div class="mb-3">
+                        <label for="materia" class="form-label">Materia</label>
+                        <textarea name="materia" id="materia" class="form-control" maxlength="5000" rows="4" required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                </div>
             </form>
         </div>
     </div>
 </div>
+
+<script>
+document.getElementById('destinatario_select').addEventListener('change', function() {
+    var customDiv = document.getElementById('destinatario_custom_div');
+    if (this.value === 'Otro') {
+        customDiv.style.display = 'block';
+    } else {
+        customDiv.style.display = 'none';
+        document.getElementById('destinatario_custom').value = '';
+    }
+});
+</script>
 {% endblock %}

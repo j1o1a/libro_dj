@@ -69,8 +69,18 @@
                         <input type="number" name="iddoc" id="iddoc" class="form-control" required>
                     </div>
                     <div class="mb-3">
-                        <label for="destinatario" class="form-label">Destinatario</label>
-                        <input type="text" name="destinatario" id="destinatario" class="form-control" maxlength="100" required>
+                        <label for="destinatario_select" class="form-label">Destinatario</label>
+                        <select name="destinatario_select" id="destinatario_select" class="form-select" required>
+                            <option value="" disabled selected>Seleccione un destinatario</option>
+                            {% for destinatario in destinatarios_predefinidos %}
+                            <option value="{{ destinatario.nombre }}">{{ destinatario.nombre }}</option>
+                            {% endfor %}
+                            <option value="Otro">Otro</option>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="destinatario_custom_div" style="display: none;">
+                        <label for="destinatario_custom" class="form-label">Especifique otro destinatario</label>
+                        <input type="text" name="destinatario_custom" id="destinatario_custom" class="form-control" maxlength="100">
                     </div>
                     <div class="mb-3">
                         <label for="materia" class="form-label">Materia</label>
@@ -85,4 +95,16 @@
         </div>
     </div>
 </div>
+
+<script>
+document.getElementById('destinatario_select').addEventListener('change', function() {
+    var customDiv = document.getElementById('destinatario_custom_div');
+    if (this.value === 'Otro') {
+        customDiv.style.display = 'block';
+    } else {
+        customDiv.style.display = 'none';
+        document.getElementById('destinatario_custom').value = '';
+    }
+});
+</script>
 {% endblock %}
