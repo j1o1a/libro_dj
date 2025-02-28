@@ -2,8 +2,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from .models import Ordinario
 from auditoria.models import Auditoria
-from django.contrib.auth.models import User
 from django.http import JsonResponse
+from datetime import datetime
 
 @login_required
 def ordinarios_lista(request):
@@ -31,7 +31,9 @@ def ordinarios_agregar(request):
             registro_id=ordinario.pk, detalles=f'Creado {ordinario.numero}'
         )
         return redirect('ordinarios_lista')
-    return JsonResponse({'html': render(request, 'ordinarios/form.html').content.decode()})
+    # Pasar la fecha actual al formulario
+    fecha_actual = datetime.now().strftime('%Y-%m-%d')
+    return render(request, 'ordinarios/form.html', {'fecha_actual': fecha_actual})
 
 @login_required
 def ordinarios_editar(request, pk):

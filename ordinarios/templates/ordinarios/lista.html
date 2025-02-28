@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends 'core/base.html' %}
 {% block content %}
 <div class="container mt-3">
     <div class="card shadow">
@@ -36,20 +36,16 @@
     </div>
 </div>
 
-<div class="modal fade" id="agregarModal">
+<div class="modal fade" id="agregarModal" tabindex="-1" aria-labelledby="agregarModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <form method="post" action="{% url 'ordinarios_agregar' %}">
                 {% csrf_token %}
-                <div class="modal-body">
-                    <input type="date" name="fecha" class="form-control" required>
-                    <input type="number" name="iddoc" class="form-control" required>
-                    <input type="text" name="destinatario" class="form-control" maxlength="100" required>
-                    <textarea name="materia" class="form-control" maxlength="5000" required></textarea>
+                <div class="modal-header">
+                    <h5 class="modal-title" id="agregarModalLabel">Agregar Nuevo Ordinario</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-footer">
-                    <button type="submit" class="btn btn-primary">Guardar</button>
-                </div>
+                {% include 'ordinarios/form.html' %}
             </form>
         </div>
     </div>
