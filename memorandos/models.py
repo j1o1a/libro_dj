@@ -1,17 +1,21 @@
 from django.db import models
-from core.models import CustomUser
+from django.contrib.auth.models import User
 
 class Memorando(models.Model):
-    numero = models.PositiveIntegerField(verbose_name="# Memorando")
-    fecha = models.DateField(verbose_name="Fecha")
-    iddoc = models.PositiveIntegerField(verbose_name="IDDOC")
-    destinatario = models.CharField(max_length=100, verbose_name="Destinatario")
-    materia = models.TextField(max_length=5000, verbose_name="Materia")
-    autor = models.ForeignKey(CustomUser, on_delete=models.CASCADE, verbose_name="Autor")
-    anulado = models.BooleanField(default=False, verbose_name="Anulado")
+    numero = models.PositiveIntegerField("Nº Ordinario", unique=True)
+    fecha = models.DateField("Fecha")
+    iddoc = models.PositiveIntegerField("IDDOC")
+    destinatario = models.CharField(max_length=100, blank=True)
+    materia = models.TextField(max_length=5000)
+    autor = models.CharField(max_length=10)  # Iniciales del usuario
+    anulada = models.BooleanField(default=False)
+    creada = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['-numero']
 
-    def __str__(self):
-        return f"Memorando #{self.numero}"
+    def save(self, *args, **kwargs):
+        if not self.pk:  # Si es nueva entrada
+            ultimo = Ordinario.objects.order_by('-numero').first()
+            self.numero = (ultimo.numero + 1) if ultimo else 1
+        super().save(*args, **kwargs)

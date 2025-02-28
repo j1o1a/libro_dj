@@ -1,8 +1,9 @@
 from django.urls import path
-from .views import OrdinarioListView, OrdinarioCreateView
+from . import views
 
-app_name = 'ordinarios'
 urlpatterns = [
-    path('', OrdinarioListView.as_view(), name='lista'),
-    path('crear/', OrdinarioCreateView.as_view(), name='crear'),
+    path('', views.ordinarios_lista, name='ordinarios_lista'),
+    path('agregar/', views.ordinarios_agregar, name='ordinarios_agregar'),
+    path('editar/<int:pk>/', views.ordinarios_editar, name='ordinarios_editar'),
+    path('anular/<int:pk>/', views.ordinarios_anular, name='ordinarios_anular'),
 ]

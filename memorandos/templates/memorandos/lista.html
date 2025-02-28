@@ -1,77 +1,72 @@
-{% extends 'core/base.html' %}
-{% load static %}
+{% extends 'base.html' %}
 {% block content %}
-<div class="card shadow mt-4">
-    <div class="card-body">
-        <h2>Lista de Memorandos</h2>
-        <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#crearModal">Agregar Memorando</button>
-        <!-- Aquí iría la tabla de memorandos -->
+<div class="container mt-3">
+    <div class="card shadow">
+        <div class="card-body">
+            <ul class="nav nav-tabs">
+                <li class="nav-item"><a class="nav-link" href="{% url 'ordinarios_lista' %}">Ordinarios</a></li>
+                <li class="nav-item"><a class="nav-link active" href="{% url 'memorandos_lista' %}">Memorandos</a></li>
+            </ul>
+            <button class="btn btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#agregarModal">Agregar</button>
+            <table class="table table-sm mt-2">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Fecha</th>
+                        <th>IDDOC</th>
+                        <th>Destinatario</th>
+                        <th>Materia</th>
+                        <th>Autor</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in memorandos %}
+                    <tr {% if m.anulada %}class="text-decoration-line-through"{% endif %}>
+                        <td>{{ m.numero }}</td>
+                        <td>{{ m.fecha|date:"d/m/y" }}</td>
+                        <td>{{ m.iddoc }}</td>
+                        <td>{{ m.destinatario }}</td>
+                        <td>{{ m.materia|truncatechars:50 }}</td>
+                        <td>{{ m.autor }}</td>
+                        <td>
+                            {% if m.autor == user.username|slice:":10" or user.is_staff %}
+                            <a href="{% url 'memorandos_editar' m.pk %}" class="btn btn-sm btn-warning">Editar</a>
+                            <a href="{% url 'memorandos_anular' m.pk %}" class="btn btn-sm btn-danger">Anular</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <select onchange="window.location.href='?mostrar='+this.value">
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="Todos">Todos</option>
+            </select>
+        </div>
     </div>
 </div>
 
-<!-- Modal para Nuevo Memorando -->
-<div class="modal fade" id="crearModal" tabindex="-1" aria-labelledby="crearModalLabel" aria-hidden="true">
+<!-- Modal para agregar -->
+<div class="modal fade" id="agregarModal">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="crearModalLabel">Nuevo Memorando</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="memorandoForm" method="post" action="{% url 'memorandos:crear' %}">
-                    {% csrf_token %}
-                    {{ form.as_p }}
+            <form method="post" action="{% url 'memorandos_agregar' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <input type="date" name="fecha" class="form-control" required>
+                    <input type="number" name="iddoc" class="form-control" required>
+                    <input type="text" name="destinatario" class="form-control" maxlength="100" required>
+                    <textarea name="materia" class="form-control" maxlength="5000" required></textarea>
+                </div>
+                <div class="modal-footer">
                     <button type="submit" class="btn btn-primary">Guardar</button>
-                </form>
-            </div>
+                </div>
+            </form>
         </div>
     </div>
 </div>
-
-<!-- Modal de confirmación (opcional) -->
-<div class="modal fade" id="numeroModal" tabindex="-1" aria-labelledby="numeroModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="numeroModalLabel">Registro Exitoso</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p>El memorando ha sido registrado con el número: <strong id="numeroAsignado"></strong></p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-primary" data-bs-dismiss="modal" onclick="location.reload();">Cerrar</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script>
-$(document).ready(function() {
-    $("#id_destinatario").autocomplete({
-        source: ["Destinatario1", "Destinatario2", "Destinatario3"]  // Reemplaza con lista dinámica en producción
-    });
-
-    $("#memorandoForm").on("submit", function(e) {
-        e.preventDefault();
-        $.ajax({
-            url: $(this).attr("action"),
-            type: "POST",
-            data: $(this).serialize(),
-            headers: {"X-Requested-With": "XMLHttpRequest"},
-            success: function(response) {
-                if (response.success) {
-                    $("#crearModal").modal("hide");
-                    $("#numeroAsignado").text(response.numero);
-                    $("#numeroModal").modal("show");
-                }
-            },
-            error: function() {
-                alert("Ocurrió un error al guardar el memorando.");
-            }
-        });
-    });
-});
-</script>
 {% endblock %}

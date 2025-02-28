@@ -1,48 +1,66 @@
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.views.generic import ListView, CreateView
-from django.urls import reverse_lazy
-from django.http import JsonResponse
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
 from .models import Memorando
-from .forms import MemorandoForm
 from auditoria.models import Auditoria
+from django.http import JsonResponse
 
-class MemorandoListView(LoginRequiredMixin, ListView):
-    model = Memorando
-    template_name = 'memorandos/lista.html'
-    context_object_name = 'object_list'
-    paginate_by = 10
+@login_required
+def memorandos_lista(request):
+    mostrar = request.GET.get('mostrar', 10)
+    if mostrar == 'Todos':
+        memorandos = Memorando.objects.all()
+    else:
+        memorandos = Memorando.objects.all()[:int(mostrar)]
+    return render(request, 'memorandos/lista.html', {'memorandos': memorandos})
 
-    def get_queryset(self):
-        mostrar = self.request.GET.get('mostrar', '10')
-        if mostrar == 'Todos':
-            return Memorando.objects.all().order_by('-numero')
-        return Memorando.objects.all().order_by('-numero')[:int(mostrar)]
-
-class MemorandoCreateView(LoginRequiredMixin, CreateView):
-    model = Memorando
-    form_class = MemorandoForm
-    template_name = 'memorandos/form.html'
-    success_url = reverse_lazy('memorandos:lista')
-
-    def form_valid(self, form):
-        # Calcular el número correlativo
-        ultimo_memorando = Memorando.objects.order_by('-numero').first()
-        form.instance.numero = (ultimo_memorando.numero + 1) if ultimo_memorando else 1
-        form.instance.autor = self.request.user
-        
-        # Guardar el objeto
-        response = super().form_valid(form)
-        
-        # Registrar en auditoría
-        Auditoria.objects.create(
-            accion="Creado", usuario=self.request.user,
-            registro_tipo="Memorando", registro_id=form.instance.id
+@login_required
+def memorandos_agregar(request):
+    if request.method == 'POST':
+        data = request.POST
+        memorando = Memorando(
+            fecha=data['fecha'],
+            iddoc=data['iddoc'],
+            destinatario=data['destinatario'],
+            materia=data['materia'],
+            autor=request.user.username[:10]  # Iniciales del usuario autenticado
         )
-        
-        # Retornar JSON para el modal si es una solicitud AJAX
-        if self.request.headers.get('x-requested-with') == 'XMLHttpRequest':
-            return JsonResponse({
-                'success': True,
-                'numero': form.instance.numero,
-            })
-        return response
+        memorando.save()
+        Auditoria.objects.create(
+            usuario=request.user, tipo='CREAR', tabla='memorandos',
+            registro_id=memorando.pk, detalles=f'Creado {memorando.numero}'
+        )
+        return redirect('memorandos_lista')
+    return JsonResponse({'html': render(request, 'memorandos/form.html').content.decode()})
+
+@login_required
+def memorandos_editar(request, pk):
+    memorando = get_object_or_404(Memorando, pk=pk)
+    # Solo el autor o un admin puede editar
+    if memorando.autor != request.user.username[:10] and not request.user.is_staff:
+        return redirect('memorandos_lista')
+    if request.method == 'POST':
+        memorando.fecha = request.POST['fecha']
+        memorando.iddoc = request.POST['iddoc']
+        memorando.destinatario = request.POST['destinatario']
+        memorando.materia = request.POST['materia']
+        memorando.save()
+        Auditoria.objects.create(
+            usuario=request.user, tipo='MODIFICAR', tabla='memorandos',
+            registro_id=pk, detalles=f'Modificado {memorando.numero}'
+        )
+        return redirect('memorandos_lista')
+    return render(request, 'memorandos/editar.html', {'memorando': memorando})
+
+@login_required
+def memorandos_anular(request, pk):
+    memorando = get_object_or_404(Memorando, pk=pk)
+    # Solo el autor o un admin puede anular
+    if memorando.autor != request.user.username[:10] and not request.user.is_staff:
+        return redirect('memorandos_lista')
+    memorando.anulada = True
+    memorando.save()
+    Auditoria.objects.create(
+        usuario=request.user, tipo='ANULAR', tabla='memorandos',
+            registro_id=pk, detalles=f'Anulado {memorando.numero}'
+    )
+    return redirect('memorandos_lista')
