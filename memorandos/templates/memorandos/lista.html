@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends 'core/base.html' %}
 {% block content %}
 <div class="container mt-3">
     <div class="card shadow">
@@ -50,19 +50,35 @@
     </div>
 </div>
 
-<!-- Modal para agregar -->
-<div class="modal fade" id="agregarModal">
+<div class="modal fade" id="agregarModal" tabindex="-1" aria-labelledby="agregarModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <form method="post" action="{% url 'memorandos_agregar' %}">
                 {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title" id="agregarModalLabel">Agregar Nuevo Memorando</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
                 <div class="modal-body">
-                    <input type="date" name="fecha" class="form-control" required>
-                    <input type="number" name="iddoc" class="form-control" required>
-                    <input type="text" name="destinatario" class="form-control" maxlength="100" required>
-                    <textarea name="materia" class="form-control" maxlength="5000" required></textarea>
+                    <div class="mb-3">
+                        <label for="fecha" class="form-label">Fecha</label>
+                        <input type="date" name="fecha" id="fecha" class="form-control" value="{{ fecha_actual }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="iddoc" class="form-label">IDDOC</label>
+                        <input type="number" name="iddoc" id="iddoc" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="destinatario" class="form-label">Destinatario</label>
+                        <input type="text" name="destinatario" id="destinatario" class="form-control" maxlength="100" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="materia" class="form-label">Materia</label>
+                        <textarea name="materia" id="materia" class="form-control" maxlength="5000" rows="4" required></textarea>
+                    </div>
                 </div>
                 <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
                     <button type="submit" class="btn btn-primary">Guardar</button>
                 </div>
             </form>

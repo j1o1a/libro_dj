@@ -2,7 +2,6 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from .models import Ordinario
 from auditoria.models import Auditoria
-from django.http import JsonResponse
 from datetime import datetime
 
 @login_required
@@ -12,14 +11,19 @@ def ordinarios_lista(request):
         ordinarios = Ordinario.objects.all()
     else:
         ordinarios = Ordinario.objects.all()[:int(mostrar)]
-    return render(request, 'ordinarios/lista.html', {'ordinarios': ordinarios})
+    fecha_actual = datetime.now().strftime('%Y-%m-%d')
+    return render(request, 'ordinarios/lista.html', {'ordinarios': ordinarios, 'fecha_actual': fecha_actual})
 
 @login_required
 def ordinarios_agregar(request):
     if request.method == 'POST':
         data = request.POST
+        # Si no hay fecha en el POST, usamos la fecha actual
+        fecha = data.get('fecha')
+        if not fecha:  # Si está vacía o no se envió
+            fecha = datetime.now().date()  # Usamos .date() para coincidir con DateField
         ordinario = Ordinario(
-            fecha=data['fecha'],
+            fecha=fecha,
             iddoc=data['iddoc'],
             destinatario=data['destinatario'],
             materia=data['materia'],
@@ -31,9 +35,7 @@ def ordinarios_agregar(request):
             registro_id=ordinario.pk, detalles=f'Creado {ordinario.numero}'
         )
         return redirect('ordinarios_lista')
-    # Pasar la fecha actual al formulario
-    fecha_actual = datetime.now().strftime('%Y-%m-%d')
-    return render(request, 'ordinarios/form.html', {'fecha_actual': fecha_actual})
+    return redirect('ordinarios_lista')
 
 @login_required
 def ordinarios_editar(request, pk):
