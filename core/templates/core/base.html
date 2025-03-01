@@ -1,13 +1,30 @@
+{% load static %}
 <!DOCTYPE html>
 <html>
 <head>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
-    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link href="{% static 'css/bootstrap.min.css' %}" rel="stylesheet">
+    <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'js/jquery-3.6.0.min.js' %}"></script>
+    <link rel="stylesheet" href="{% static 'css/jquery-ui.css' %}">
+    <script src="{% static 'js/jquery-ui.js' %}"></script>
 </head>
 <body>
+        <!-- Navbar (Fondo negro) -->
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+            <div class="container-fluid">
+                <!-- Logo -->
+                <a class="navbar-brand" href="{ url 'home' }">
+                    <img src="{% static 'images/logo_blanco.svg.br' %}" alt="Logo La Florida" height="40">
+                </a>
+    
+                <!-- Usuario Loggeado -->
+                <div class="d-flex align-items-center text-white">
+                    <i class="bi bi-person-circle fs-4 me-2"></i> <!-- Ícono de usuario -->
+                    <span class="me-3">{{ user.username }}</span>
+                    <a href="{ url 'logout' }" class="btn btn-outline-light btn-sm">Cerrar sesión</a>
+                </div>
+            </div>
+        </nav>
     {% block content %}{% endblock %}
 </body>
 </html>
