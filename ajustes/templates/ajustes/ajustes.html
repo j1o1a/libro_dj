@@ -1,11 +1,44 @@
 {% extends 'core/base.html' %}
+{% block title %}Ajustes{% endblock %}
 {% block content %}
-<div class="container mt-3">
-    <div class="card shadow">
-        <div class="card-body">
-            <h2>Ajustes</h2>
-            <p>Esta sección está reservada para usuarios administrativos.</p>
-            <!-- Contenido adicional de ajustes aquí -->
+<div class="mt-3">
+    <p>Esta es la página de ajustes. Aquí puedes gestionar configuraciones del sistema.</p>
+    <hr>
+    {% if message %}
+    <div class="alert alert-info" role="alert">
+        {{ message }}
+    </div>
+    {% endif %}
+    
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#importarModal">Importar</button>
+</div>
+
+<!-- Modal de Importación -->
+<div class="modal fade" id="importarModal" tabindex="-1" aria-labelledby="importarModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="importarModalLabel">Importar base de datos</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <p class="justify-text">Acá puedes importar un archivo a la base de datos. El archivo tiene que ser "CSV" (si usas Excel, guarda la base de datos como "Valores separados por comas").</p>
+                    <p class="justify-text">Es importante que tengas presente que la importación va a borrar todos los datos de la base de datos actual. Procede con cuidado.</p>
+                    <div class="mb-3">
+                        {{ form.table.label_tag }}
+                        {{ form.table }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.csv_file }}
+                    </div>
+                </div>
+                <div class="modal-footer text-center">
+                    <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">Mejor no.</button>
+                    <button type="submit" class="btn btn-danger">Proceder</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

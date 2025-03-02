@@ -1,52 +1,215 @@
 {% extends 'core/base.html' %}
+{% block title %}Libro de ordinarios{% endblock %}
 {% block content %}
-<div class="container mt-3">
-    <div class="card shadow">
-        <div class="card-body">
-            <ul class="nav nav-tabs">
-                <li class="nav-item"><a class="nav-link active" href="{% url 'ordinarios_lista' %}">Ordinarios</a></li>
-                <li class="nav-item"><a class="nav-link" href="{% url 'memorandos_lista' %}">Memorandos</a></li>
-                {% if user.is_staff %}
-                <li class="nav-item"><a class="nav-link" href="{% url 'ajustes' %}">Ajustes</a></li>
-                {% endif %}
-            </ul>
-            <button class="btn btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#agregarModal">Agregar</button>
-            <table class="table table-sm mt-2">
-                <thead><tr><th>#</th><th>Fecha</th><th>IDDOC</th><th>Destinatario</th><th>Materia</th><th>Autor</th><th>Acciones</th></tr></thead>
-                <tbody>
-                    {% for o in ordinarios %}
-                    <tr {% if o.anulada %}class="text-decoration-line-through"{% endif %}>
-                        <td>{{ o.numero }}</td><td>{{ o.fecha|date:"d/m/y" }}</td><td>{{ o.iddoc }}</td><td>{{ o.destinatario }}</td>
-                        <td>{{ o.materia|truncatechars:50 }}</td><td>{{ o.autor }}</td>
-                        <td>
-                            {% if o.autor == user.username|slice:":10" or user.is_staff %}
-                            <a href="{% url 'ordinarios_editar' o.pk %}" class="btn btn-sm btn-warning">Editar</a>
-                            <a href="{% url 'ordinarios_anular' o.pk %}" class="btn btn-sm btn-danger">Anular</a>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            Ítems por página:
-            <select onchange="window.location.href='?mostrar='+this.value">
-                <option value="10">10</option>
-                <option value="20">20</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-                <option value="Todos">Todos</option>
-            </select>
+    <style>
+        .btn-secondary.pulse-animation {
+            animation: pulse 1s infinite;
+        }
+        .btn-secondary.pulse-animation:disabled {
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0% {
+                background-color: #dc3545;
+                transform: scale(1);
+            }
+            50% {
+                background-color: #c82333;
+                transform: scale(1.05);
+            }
+            100% {
+                background-color: #dc3545;
+                transform: scale(1);
+            }
+        }
+    </style>
+    <div class="d-flex justify-content-between mt-2">
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#agregarModal" {% if config.bloqueado %}disabled{% endif %}>Agregar</button>
+        {% if config.bloqueado and config.bloqueado_por != user and not user.is_staff %}
+        <button type="button" class="btn btn-secondary pulse-animation" data-bs-toggle="modal" data-bs-target="#bloqueadoInfoModal">Libro Bloqueado</button>
+        {% elif config.bloqueado %}
+        <a href="{% url 'ordinarios_bloquear' %}" class="btn btn-secondary pulse-animation">Libro Bloqueado</a>
+        {% else %}
+        <a href="{% url 'ordinarios_bloquear' %}" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#bloquearModal">Bloquear Libro</a>
+        {% endif %}
+    </div>
+    {% if messages %}
+    <div class="mt-2">
+        {% for message in messages %}
+        <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-danger{% endif %}" role="alert">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    <table class="table table-sm table-bordered mt-2 small">
+        <thead class="table-light">
+            <tr class="text-center">
+                <th class="text-center">N.° ord.</th>
+                <th class="text-center">Fecha</th>
+                <th class="text-center">IDDOC</th>
+                <th class="text-start">Destinatario</th>
+                <th class="text-start">Materia</th>
+                <th class="text-center">Autor</th>
+                <th class="text-end">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for o in ordinarios %}
+            <tr class="text-center">
+                <td class="fw-bold {% if o.anulada %}text-decoration-line-through{% endif %}">{{ o.numero }}</td>
+                <td class="{% if o.anulada %}text-decoration-line-through{% endif %}">{{ o.fecha|date:"d/m/y" }}</td>
+                <td class="{% if o.anulada %}text-decoration-line-through{% endif %}">{{ o.iddoc|default:"Sin IDDOC" }}</td>
+                <td class="text-start {% if o.anulada %}text-decoration-line-through{% endif %}">{{ o.destinatario }}</td>
+                <td class="text-start {% if o.anulada %}text-decoration-line-through{% endif %}">{{ o.materia|truncatechars:50 }}</td>
+                <td class="{% if o.anulada %}text-decoration-line-through{% endif %}">{{ o.autor }}</td>
+                <td class="text-end">
+                    {% if o.autor == user.username|slice:":10" or user.is_staff %}
+                    <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#editarModal{{ o.pk }}">Editar</button>
+                    <a href="{% url 'ordinarios_anular' o.pk %}" class="btn btn-sm btn-danger">
+                        {% if o.anulada %}Anulado{% else %}Anular{% endif %}
+                    </a>
+                    {% endif %}
+                    {% if o.autor == user.username|slice:":10" %}
+                    {% with ultima_entrada=ordinarios|first %}
+                    {% if ultima_entrada and o.pk == ultima_entrada.pk %}
+                    <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#eliminarModal{{ o.pk }}" {% if config.bloqueado %}disabled{% endif %}>Eliminar</button>
+                    {% endif %}
+                    {% endwith %}
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    Ítems por página:
+    <select onchange="window.location.href='?mostrar='+this.value">
+        <option value="10">10</option>
+        <option value="20">20</option>
+        <option value="50">50</option>
+        <option value="100">100</option>
+        <option value="Todos">Todos</option>
+    </select>
+
+    <!-- Modal de Confirmación de Eliminación -->
+    {% for o in ordinarios %}
+    {% if o.autor == user.username|slice:":10" %}
+    {% with ultima_entrada=ordinarios|first %}
+    {% if ultima_entrada and o.pk == ultima_entrada.pk %}
+    <div class="modal fade" id="eliminarModal{{ o.pk }}" tabindex="-1" aria-labelledby="eliminarModalLabel{{ o.pk }}" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="eliminarModalLabel{{ o.pk }}">Confirmar Eliminación</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    ¿Estás seguro de que deseas eliminar el ordinario #{{ o.numero }} con destinatario "{{ o.destinatario }}"?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <a href="{% url 'ordinarios_eliminar' o.pk %}" class="btn btn-danger">Eliminar</a>
+                </div>
+            </div>
         </div>
     </div>
-</div>
+    {% endif %}
+    {% endwith %}
+    {% endif %}
+    {% endfor %}
 
+    <!-- Modal de Bloqueo -->
+    <div class="modal fade" id="bloquearModal" tabindex="-1" aria-labelledby="bloquearModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="bloquearModalLabel">Confirmar bloqueo del Libro de Ordinarios</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="justify-text">¿Está seguro que quiere bloquear el libro de ordinario? Ningún otro usuario podrá anotar un nuevo registro. Eso podría causar la ira del resto de los funcionarios.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Mejor no.</button>
+                    <a href="{% url 'ordinarios_bloquear' %}" class="btn btn-danger">Sí, ¡haz lo que digo!</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Informativo de Libro Bloqueado -->
+    {% if config.bloqueado %}
+    <div class="modal fade" id="bloqueadoInfoModal" tabindex="-1" aria-labelledby="bloqueadoInfoModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="bloqueadoInfoModalLabel">Libro Bloqueado</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    El libro fue bloqueado por {{ config.bloqueado_por.username }}. Pídele que lo desbloquee o contacta a un funcionario con facultades de administrativo para que desbloquee el libro.
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Modal de Editar -->
+    {% for o in ordinarios %}
+    {% if o.autor == user.username|slice:":10" or user.is_staff %}
+    <div class="modal fade" id="editarModal{{ o.pk }}" tabindex="-1" aria-labelledby="editarModalLabel{{ o.pk }}" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="post" action="{% url 'ordinarios_editar' o.pk %}">
+                    {% csrf_token %}
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="editarModalLabel{{ o.pk }}">Editar ordinario número {{ o.numero }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="numero_{{ o.pk }}" class="form-label">N.º Ordinario</label>
+                            <input type="number" name="numero" id="numero_{{ o.pk }}" class="form-control" value="{{ o.numero }}" disabled>
+                        </div>
+                        <div class="mb-3">
+                            <label for="fecha_{{ o.pk }}" class="form-label">Fecha</label>
+                            <input type="date" name="fecha" id="fecha_{{ o.pk }}" class="form-control" value="{{ o.fecha|date:'Y-m-d' }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="iddoc_{{ o.pk }}" class="form-label">IDDOC</label>
+                            <input type="text" name="iddoc" id="iddoc_{{ o.pk }}" class="form-control" value="{{ o.iddoc|default:'' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="destinatario_{{ o.pk }}" class="form-label">Destinatario</label>
+                            <input type="text" name="destinatario" id="destinatario_{{ o.pk }}" class="form-control" value="{{ o.destinatario }}" maxlength="100" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="materia_{{ o.pk }}" class="form-label">Materia</label>
+                            <textarea name="materia" id="materia_{{ o.pk }}" class="form-control" maxlength="5000" rows="4" required>{{ o.materia }}</textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                        <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+
+<!-- Modal de Agregar -->
 <div class="modal fade" id="agregarModal" tabindex="-1" aria-labelledby="agregarModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <form method="post" action="{% url 'ordinarios_agregar' %}">
                 {% csrf_token %}
-                <div class="modal-header">
-                    <h5 class="modal-title" id="agregarModalLabel">Agregar Nuevo Ordinario</h5>
+                <div class="modal-header bg-secondary text-white">
+                    <h5 class="modal-title" id="agregarModalLabel">Agregar nuevo ordinario</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
@@ -56,7 +219,7 @@
                     </div>
                     <div class="mb-3">
                         <label for="iddoc" class="form-label">IDDOC</label>
-                        <input type="number" name="iddoc" id="iddoc" class="form-control" required>
+                        <input type="text" name="iddoc" id="iddoc" class="form-control" placeholder="Ej: 1234567, 7890123">
                     </div>
                     <div class="mb-3">
                         <label for="destinatario_select" class="form-label">Destinatario</label>
@@ -77,7 +240,7 @@
                         <textarea name="materia" id="materia" class="form-control" maxlength="5000" rows="4" required></textarea>
                     </div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer justify-content-center">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
                     <button type="submit" class="btn btn-primary">Guardar</button>
                 </div>
@@ -86,15 +249,15 @@
     </div>
 </div>
 
-<script>
-document.getElementById('destinatario_select').addEventListener('change', function() {
-    var customDiv = document.getElementById('destinatario_custom_div');
-    if (this.value === 'Otro') {
-        customDiv.style.display = 'block';
-    } else {
-        customDiv.style.display = 'none';
-        document.getElementById('destinatario_custom').value = '';
-    }
-});
-</script>
+    <script>
+    document.getElementById('destinatario_select').addEventListener('change', function() {
+        var customDiv = document.getElementById('destinatario_custom_div');
+        if (this.value === 'Otro') {
+            customDiv.style.display = 'block';
+        } else {
+            customDiv.style.display = 'none';
+            document.getElementById('destinatario_custom').value = '';
+        }
+    });
+    </script>
 {% endblock %}

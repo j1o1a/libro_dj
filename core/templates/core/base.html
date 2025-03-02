@@ -6,25 +6,69 @@
     <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
     <script src="{% static 'js/jquery-3.6.0.min.js' %}"></script>
     <link rel="stylesheet" href="{% static 'css/jquery-ui.css' %}">
-    <script src="{% static 'js/jquery-ui.js' %}"></script>
+    <script src="{% static 'js/jquery-ui.min.js' %}"></script>
+    <link rel="icon" type="image/png" href="{% static 'img/favicon.svg' %}">
+    <title>{% block title %}Título por defecto{% endblock %}</title>
 </head>
 <body>
-        <!-- Navbar (Fondo negro) -->
-        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-            <div class="container-fluid">
-                <!-- Logo -->
-                <a class="navbar-brand" href="{ url 'home' }">
-                    <img src="{% static 'images/logo_blanco.svg.br' %}" alt="Logo La Florida" height="40">
-                </a>
-    
-                <!-- Usuario Loggeado -->
-                <div class="d-flex align-items-center text-white">
-                    <i class="bi bi-person-circle fs-4 me-2"></i> <!-- Ícono de usuario -->
-                    <span class="me-3">{{ user.username }}</span>
-                    <a href="{ url 'logout' }" class="btn btn-outline-light btn-sm">Cerrar sesión</a>
-                </div>
+    <style>
+        .rectangle {
+            display: inline-block;
+            width: 5px;
+            height: 13px;
+            background-color: #08ad1d;
+            vertical-align: baseline;
+        }
+        .justify-text {
+            text-align: justify;
+        }
+    </style>
+    <!-- Navbar (Fondo negro) -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <!-- Logo -->
+            <a class="navbar-brand" href="{% url 'ordinarios_lista' %}">
+                <img src="{% static 'img/logo_blanco.svg' %}" alt="Logo La Florida" height="40">
+            </a>
+            <!-- Usuario Loggeado -->
+            <div class="d-flex align-items-center text-white">
+                <i class="bi bi-person-circle fs-4 me-2"></i>
+                <span class="me-3">{{ user.username }}</span>
+                <form method="post" action="{% url 'logout' %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-light btn-sm">Cerrar sesión</button>
+                </form>
             </div>
-        </nav>
-    {% block content %}{% endblock %}
+        </div>
+    </nav>
+    <div class="container mt-3">
+        <div class="card shadow">
+            <div class="card-body">
+    <!-- Pestañas de Navegación -->
+    <ul class="nav nav-tabs mt-3">
+        <li class="nav-item">
+            <a class="nav-link {% if active_tab == 'ordinarios' %}active{% endif %}" href="{% url 'ordinarios_lista' %}">Ordinarios</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if active_tab == 'memorandos' %}active{% endif %}" href="{% url 'memorandos_lista' %}">Memorandos</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if active_tab == 'busqueda' %}active{% endif %}" href="#">Búsqueda</a>
+        </li>
+        {% if user.is_staff %}
+        <li class="nav-item">
+            <a class="nav-link {% if active_tab == 'ajustes' %}active{% endif %}" href="{% url 'ajustes' %}">Ajustes</a>
+        </li>
+        {% endif %}
+    </ul>
+
+                {% block content %}{% endblock %}
+            </div>
+            <div class="card-footer text-muted">
+                <span class="rectangle"></span>
+                DIRECCIÓN JURÍDICA
+            </div>
+        </div>
+    </div>
 </body>
 </html>
