@@ -49,32 +49,49 @@ def ajustes(request):
                     })
                 
                 model = Ordinario if table == 'ordinarios' else Memorando
+                csv_rows = list(reader)
+                csv_rows.sort(key=lambda row: int(row['numero']), reverse=True)
                 
                 with transaction.atomic():
                     model.objects.all().delete()
                     registros = []
-                    for row in reader:
+                    for row in csv_rows:
                         numero = int(row['numero'])
                         fecha = datetime.strptime(row['fecha'], '%d-%m-%y').date()
-                        iddoc = int(row['iddoc'].replace('.', '')) if row['iddoc'] else None
-                        redom = row['redom'] != ''
+                        iddoc_raw = row['iddoc'].strip()
+                        iddoc_clean = iddoc_raw.replace(' - ', ',')
+                        iddoc_list = [idd.strip() for idd in iddoc_clean.split(',') if idd.strip()]
                         
-                        registros.append(model(
-                            numero=numero,
-                            fecha=fecha,
-                            iddoc=iddoc,
-                            destinatario=row['destinatario'],
-                            materia=row['materia'],
-                            autor=row['iniciales'],
-                            anulada=False,
-                            redom=redom,
-                        ))
+                        if not iddoc_list:
+                            registros.append(model(
+                                numero=numero,
+                                fecha=fecha,
+                                iddoc=None,
+                                destinatario=row['destinatario'],
+                                materia=row['materia'],
+                                autor=row['iniciales'],
+                                anulada=False,
+                                redom=row['redom'] != '',
+                            ))
+                        else:
+                            for iddoc_str in iddoc_list:
+                                iddoc = int(iddoc_str.replace('.', '')) if iddoc_str else None
+                                registros.append(model(
+                                    numero=numero,
+                                    fecha=fecha,
+                                    iddoc=iddoc,
+                                    destinatario=row['destinatario'],
+                                    materia=row['materia'],
+                                    autor=row['iniciales'],
+                                    anulada=False,
+                                    redom=row['redom'] != '',
+                                ))
                     
                     model.objects.bulk_create(registros)
                 
                 messages.success(request, f'Se importaron {len(registros)} registros a {table} correctamente.')
             except ValueError as e:
-                messages.error(request, f'Error en los datos del CSV: {str(e)}. Asegúrate de que "numero", "iddoc" y "redom" sean válidos y "fecha" esté en formato dd-mm-aa.')
+                messages.error(request, f'Error en los datos del CSV: {str(e)}. Asegúrate de que "numero" y "iddoc" sean números válidos y "fecha" sea dd-mm-yy.')
             except Exception as e:
                 messages.error(request, f'Error al procesar el CSV: {str(e)}')
             

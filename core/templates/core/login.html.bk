@@ -1,0 +1,85 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inicio de Sesión</title>
+    <!-- Bootstrap CSS -->
+    <link href="{% static 'css/bootstrap.min.css' %}" rel="stylesheet">
+    <!-- Estilos personalizados -->
+    <style>
+        body {
+            background-color: #f8f9fa;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .login-card {
+            max-width: 400px;
+            width: 100%;
+        }
+        .btn-custom {
+            background-color: #08ad1d;
+            border-color: #08ad1d;
+            color: white;
+        }
+        .btn-custom:hover {
+            background-color: #067e16; /* Un tono más oscuro para el hover */
+            border-color: #067e16;
+        }
+        .image-container {
+            width: 100%;
+            margin-bottom: 1.5rem;
+            text-align: center; /* Centra la imagen */
+        }
+        .image-placeholder {
+            font-size: 1.2rem;
+            padding: 20px;
+            display: inline-block;
+        }
+        .login-image {
+            max-width: 100%; /* La imagen no supera el ancho del contenedor */
+            height: auto; /* Mantiene la proporción */
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <div class="card shadow">
+            <div class="card-body p-4">
+                <!-- Placeholder para la imagen -->
+                <div class="image-placeholder">
+                    <img src="{% static 'img/logo_negro.svg.br' %}" class="login-image img-fluid" alt="Logo Mun. de La FLorida">
+                </div>
+                <h3 class="card-title text-center mb-4">Inicio de Sesión</h3>
+                <form action="#" method="POST">
+                    
+                    <!-- Campo de usuario -->
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Usuario</label>
+                        <input type="text" class="form-control" id="username" name="username" placeholder="Ingresa tu usuario" required>
+                    </div>
+                    <!-- Campo de contraseña -->
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Contraseña</label>
+                        <input type="password" class="form-control" id="password" name="password" placeholder="Ingresa tu contraseña" required>
+                    </div>
+                    <!-- Botón de enviar -->
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-custom">Iniciar Sesión</button>
+                    </div>
+                </form>
+                <!-- Enlace opcional para recuperar contraseña -->
+                <div class="text-center mt-3">
+                    <a href="#" class="text-muted">¿Olvidaste tu contraseña?</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS (opcional) -->
+    <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+</body>
+</html>

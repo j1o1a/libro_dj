@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db import transaction
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from .models import Ordinario, LibroConfig
 from auditoria.models import Auditoria
 from datetime import datetime
@@ -9,16 +10,48 @@ from datetime import datetime
 @login_required
 def ordinarios_lista(request):
     from destinatarios.models import Destinatario
-    mostrar = request.GET.get('mostrar', 10)
-    if mostrar == 'Todos':
-        ordinarios = Ordinario.objects.all()
+    
+    # Obtener el número de ítems por página desde el request (default=10)
+    items_per_page = request.GET.get('items_per_page', '10')  # Cambiado a cadena '10'
+    
+    # Obtener todos los ordinarios, ordenados por número descendente
+    ordinarios_list = Ordinario.objects.all().order_by('-numero')
+    
+    # Si se selecciona "Todos", no paginar
+    if items_per_page == 'all':
+        paginated_ordinarios = ordinarios_list
+        page_obj = None  # No hay paginación
     else:
-        ordinarios = Ordinario.objects.all()[:int(mostrar)]
+        # Convertir items_per_page a entero para el Paginator, fallback a 10 si falla
+        try:
+            items_per_page_int = int(items_per_page)
+        except (ValueError, TypeError):
+            items_per_page_int = 10
+            items_per_page = '10'  # Aseguramos que items_per_page sea cadena
+        
+        # Crear el objeto Paginator
+        paginator = Paginator(ordinarios_list, items_per_page_int)
+        
+        # Obtener el número de página desde el request
+        page = request.GET.get('page', 1)
+        
+        try:
+            paginated_ordinarios = paginator.page(page)
+        except PageNotAnInteger:
+            paginated_ordinarios = paginator.page(1)
+        except EmptyPage:
+            paginated_ordinarios = paginator.page(paginator.num_pages)
+        
+        page_obj = paginated_ordinarios
+    
     fecha_actual = datetime.now().strftime('%Y-%m-%d')
     destinatarios_predefinidos = Destinatario.objects.all()
     config, created = LibroConfig.objects.get_or_create(id=1)
+    
     return render(request, 'ordinarios/lista.html', {
-        'ordinarios': ordinarios,
+        'ordinarios': paginated_ordinarios,
+        'page_obj': page_obj,
+        'items_per_page': str(items_per_page),
         'fecha_actual': fecha_actual,
         'destinatarios_predefinidos': destinatarios_predefinidos,
         'config': config,
@@ -37,10 +70,25 @@ def ordinarios_agregar(request):
         fecha = data.get('fecha') or datetime.now().date()
         destinatario_select = data.get('destinatario_select')
         destinatario_custom = data.get('destinatario_custom', '').strip()
-        destinatario = destinatario_custom if destinatario_select == "Otro" and destinatario_custom else destinatario_select
-        
-        # Procesar iddoc como lista separada por comas (con o sin espacios)
+        materia = data.get('materia', '').strip()
         iddoc_input = data.get('iddoc', '').strip()
+        
+        # Validar que destinatario_custom no esté vacío si se seleccionó "Otro"
+        if destinatario_select == "Otro" and not destinatario_custom:
+            messages.error(request, 'Por favor, especifique un destinatario personalizado.')
+            return render(request, 'ordinarios/lista.html', {
+                'ordinarios': Ordinario.objects.all(),
+                'fecha_actual': datetime.now().strftime('%Y-%m-%d'),
+                'destinatarios_predefinidos': Destinatario.objects.all(),
+                'config': config,
+                'active_tab': 'ordinarios',
+                'form_data': data,
+            })
+        
+        # Determinar el valor final de destinatario
+        destinatario = destinatario_custom if destinatario_select == "Otro" else destinatario_select
+        
+        # Procesar los valores de iddoc
         iddoc_list = [idd.strip() for idd in iddoc_input.split(',') if idd.strip()]
         
         try:
@@ -49,19 +97,34 @@ def ordinarios_agregar(request):
                 numero = (ultimo.numero + 1) if ultimo else 1
                 
                 registros = []
-                for iddoc_str in iddoc_list:
-                    iddoc = int(iddoc_str.replace('.', '')) if iddoc_str else None
+                # Si no se proporcionaron valores de iddoc, crear un registro con iddoc=None
+                if not iddoc_list:
                     ordinario = Ordinario(
                         numero=numero,
                         fecha=fecha,
-                        iddoc=iddoc,
+                        iddoc=None,
                         destinatario=destinatario,
-                        materia=data['materia'],
+                        materia=materia,
                         autor=request.user.username[:10],
                         anulada=False,
                         redom=False
                     )
                     registros.append(ordinario)
+                else:
+                    # Crear un registro por cada iddoc proporcionado
+                    for iddoc_str in iddoc_list:
+                        iddoc = int(iddoc_str.replace('.', '')) if iddoc_str else None
+                        ordinario = Ordinario(
+                            numero=numero,
+                            fecha=fecha,
+                            iddoc=iddoc,
+                            destinatario=destinatario,
+                            materia=materia,
+                            autor=request.user.username[:10],
+                            anulada=False,
+                            redom=False
+                        )
+                        registros.append(ordinario)
                 
                 Ordinario.objects.bulk_create(registros)
                 
