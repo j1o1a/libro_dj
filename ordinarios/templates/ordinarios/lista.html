@@ -153,9 +153,9 @@
 <div class="modal fade" id="eliminarModal{{ o.pk }}" tabindex="-1" aria-labelledby="eliminarModalLabel{{ o.pk }}" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header">
+            <div class="modal-header bg-primary text-white small">
                 <h5 class="modal-title" id="eliminarModalLabel{{ o.pk }}">Confirmar Eliminación</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 ¿Estás seguro de que deseas eliminar el ordinario #{{ o.numero }} con destinatario "{{ o.destinatario }}"?
@@ -176,9 +176,9 @@
 <div class="modal fade" id="bloquearModal" tabindex="-1" aria-labelledby="bloquearModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header">
+            <div class="modal-header bg-primary text-white small">
                 <h5 class="modal-title" id="bloquearModalLabel">Confirmar bloqueo del Libro de Ordinarios</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <p class="justify-text">¿Está seguro que quiere bloquear el libro de ordinario? Ningún otro usuario podrá anotar un nuevo registro. Eso podría causar la ira del resto de los funcionarios.</p>
@@ -196,9 +196,9 @@
 <div class="modal fade" id="bloqueadoInfoModal" tabindex="-1" aria-labelledby="bloqueadoInfoModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header">
+            <div class="modal-header bg-primary text-white small">
                 <h5 class="modal-title" id="bloqueadoInfoModalLabel">Libro Bloqueado</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 El libro fue bloqueado por {{ config.bloqueado_por.username }}. Pídele que lo desbloquee o contacta a un funcionario con facultades de administrativo para que desbloquee el libro.
@@ -219,9 +219,9 @@
         <div class="modal-content">
             <form method="post" action="{% url 'ordinarios_editar' o.pk %}">
                 {% csrf_token %}
-                <div class="modal-header">
+                <div class="modal-header bg-primary text-white small">
                     <h5 class="modal-title" id="editarModalLabel{{ o.pk }}">Editar ordinario número {{ o.numero }}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
@@ -262,9 +262,9 @@
         <div class="modal-content">
             <form method="post" action="{% url 'ordinarios_agregar' %}" id="agregarOrdinarioForm">
                 {% csrf_token %}
-                <div class="modal-header bg-secondary text-white">
+                <div class="modal-header bg-primary text-white small">
                     <h5 class="modal-title" id="agregarModalLabel">Agregar nuevo ordinario</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     {% if messages %}
@@ -287,19 +287,22 @@
                         <select name="destinatario_select" id="destinatario_select" class="form-select" required>
                             <option value="" disabled {% if not form_data.destinatario_select %}selected{% endif %}>Seleccione un destinatario</option>
                             <optgroup label="Dentro del Municipio">
-                                {% for destinatario in destinatarios_predefinidos %}
+                                {% for destinatario in destinatarios_dentro %}
                                 <option value="{{ destinatario.nombre }}" {% if form_data.destinatario_select == destinatario.nombre %}selected{% endif %}>{{ destinatario.nombre }}</option>
                                 {% endfor %}
+                                <option value="Otro_Dentro" {% if form_data.destinatario_select == "Otro_Dentro" %}selected{% endif %}>Otro (Especificar)</option>
                             </optgroup>
-                            <optgroup label="Otros">
-                                <option value="Otro" disabled>-- Fuera del municipio --</option>
-                                <option value="Otro" {% if form_data.destinatario_select == "Otro" %}selected{% endif %}>Otro</option>
+                            <optgroup label="Fuera del Municipio">
+                                {% for destinatario in destinatarios_fuera %}
+                                <option value="{{ destinatario.nombre }}" {% if form_data.destinatario_select == destinatario.nombre %}selected{% endif %}>{{ destinatario.nombre }}</option>
+                                {% endfor %}
+                                <option value="Otro_Fuera" {% if form_data.destinatario_select == "Otro_Fuera" %}selected{% endif %}>Otro (Especificar)</option>
                             </optgroup>
                         </select>
                     </div>
-                    <div class="mb-3" id="destinatario_custom_div" style="display: {% if form_data.destinatario_select == 'Otro' %}block{% else %}none{% endif %};">
+                    <div class="mb-3" id="destinatario_custom_div" style="display: {% if form_data.destinatario_select == 'Otro_Dentro' or form_data.destinatario_select == 'Otro_Fuera' %}block{% else %}none{% endif %};">
                         <label for="destinatario_custom" class="form-label">Especifique otro destinatario</label>
-                        <input type="text" name="destinatario_custom" id="destinatario_custom" class="form-control" maxlength="100" value="{% if form_data.destinatario_custom %}{{ form_data.destinatario_custom }}{% endif %}" {% if form_data.destinatario_select == 'Otro' %}required{% endif %}>
+                        <input type="text" name="destinatario_custom" id="destinatario_custom" class="form-control" maxlength="100" value="{% if form_data.destinatario_custom %}{{ form_data.destinatario_custom }}{% endif %}" {% if form_data.destinatario_select == 'Otro_Dentro' or form_data.destinatario_select == 'Otro_Fuera' %}required{% endif %}>
                     </div>
                     <div class="mb-3">
                         <label for="materia" class="form-label">Materia</label>
@@ -319,14 +322,21 @@
 document.getElementById('destinatario_select').addEventListener('change', function() {
     var customDiv = document.getElementById('destinatario_custom_div');
     var customInput = document.getElementById('destinatario_custom');
-    if (this.value === 'Otro') {
+    var customLabel = document.querySelector('label[for="destinatario_custom"]');
+    
+    if (this.value === 'Otro_Dentro') {
         customDiv.style.display = 'block';
         customInput.setAttribute('required', 'required');
+        customLabel.textContent = 'Especifique otro destinatario (dentro)';
+    } else if (this.value === 'Otro_Fuera') {
+        customDiv.style.display = 'block';
+        customInput.setAttribute('required', 'required');
+        customLabel.textContent = 'Especifique otro destinatario (fuera)';
     } else {
         customDiv.style.display = 'none';
         customInput.removeAttribute('required');
         customInput.value = '';
+        customLabel.textContent = 'Especifique otro destinatario';
     }
 });
-</script>
-{% endblock %}
+</script>{% endblock %}

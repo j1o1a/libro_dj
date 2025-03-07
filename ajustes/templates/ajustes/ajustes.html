@@ -4,22 +4,71 @@
 <div class="mt-3">
     <p>Esta es la página de ajustes. Aquí puedes gestionar configuraciones del sistema.</p>
     <hr>
-    {% if message %}
-    <div class="alert alert-info" role="alert">
-        {{ message }}
+    {% if messages %}
+    <div class="mt-2">
+        {% for message in messages %}
+        <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-danger{% endif %}" role="alert">
+            {{ message }}
+        </div>
+        {% endfor %}
     </div>
     {% endif %}
-    
-    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#importarModal">Importar</button>
+
+    <!-- Importar CSV -->
+    <h5>Importar Base de Datos</h5>
+    <button type="button" class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#importarModal">Importar</button>
+
+    <!-- Gestionar Destinatarios -->
+    <h5>Gestionar Destinatarios</h5>
+    <form method="post" class="mb-3">
+        {% csrf_token %}
+        <div class="row g-3">
+            <div class="col-md-6">
+                {{ destinatario_form.nombre.label_tag }}
+                {{ destinatario_form.nombre }}
+            </div>
+            <div class="col-md-4">
+                {{ destinatario_form.es_municipio.label_tag }}
+                {{ destinatario_form.es_municipio }}
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" name="destinatario_submit" class="btn btn-primary w-100">Agregar</button>
+            </div>
+        </div>
+    </form>
+
+    <!-- Lista de Destinatarios -->
+    {% if destinatarios %}
+    <table class="table table-sm table-bordered small">
+        <thead class="table-light">
+            <tr>
+                <th>Nombre</th>
+                <th>Categoría</th>
+                <th>Orden</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for destinatario in destinatarios %}
+            <tr>
+                <td>{{ destinatario.nombre }}</td>
+                <td>{{ destinatario.es_municipio|yesno:"Dentro del Municipio,Fuera del Municipio" }}</td>
+                <td>{{ destinatario.orden }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No hay destinatarios registrados.</p>
+    {% endif %}
 </div>
 
 <!-- Modal de Importación -->
 <div class="modal fade" id="importarModal" tabindex="-1" aria-labelledby="importarModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header">
+            <div class="modal-header bg-primary text-white small">
                 <h5 class="modal-title" id="importarModalLabel">Importar base de datos</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
@@ -27,16 +76,16 @@
                     <p class="justify-text">Acá puedes importar un archivo a la base de datos. El archivo tiene que ser "CSV" (si usas Excel, guarda la base de datos como "Valores separados por comas").</p>
                     <p class="justify-text">Es importante que tengas presente que la importación va a borrar todos los datos de la base de datos actual. Procede con cuidado.</p>
                     <div class="mb-3">
-                        {{ form.table.label_tag }}
-                        {{ form.table }}
+                        {{ csv_form.table.label_tag }}
+                        {{ csv_form.table }}
                     </div>
                     <div class="mb-3">
-                        {{ form.csv_file }}
+                        {{ csv_form.csv_file }}
                     </div>
                 </div>
                 <div class="modal-footer text-center">
                     <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">Mejor no.</button>
-                    <button type="submit" class="btn btn-danger">Proceder</button>
+                    <button type="submit" name="csv_submit" class="btn btn-danger">Proceder</button>
                 </div>
             </form>
         </div>
