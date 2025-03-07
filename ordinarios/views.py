@@ -1,17 +1,25 @@
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db import transaction
 from django.contrib import messages
+from django.urls import reverse
 from datetime import datetime
 from ordinarios.models import Ordinario, LibroConfig
 from destinatarios.models import Destinatario
 from auditoria.models import Auditoria
 
+# Función auxiliar para calcular la página de un ordinario
+def get_page_for_ordinario(ordinario, items_per_page):
+    ordinarios_list = Ordinario.objects.all().order_by('-numero')
+    items_per_page_int = ordinarios_list.count() if items_per_page == 'all' else int(items_per_page)
+    paginator = Paginator(ordinarios_list, items_per_page_int)
+    position = next(i + 1 for i, o in enumerate(ordinarios_list) if o.pk == ordinario.pk)
+    page = (position - 1) // items_per_page_int + 1 if position > 0 else 1
+    return page
+
 @login_required
 def ordinarios_lista(request):
-    from destinatarios.models import Destinatario
-    
     items_per_page = request.GET.get('items_per_page', '10')
     ordinarios_list = Ordinario.objects.all().order_by('-numero')
     
@@ -52,13 +60,16 @@ def ordinarios_lista(request):
         'config': config,
         'active_tab': 'ordinarios',
     })
- 
+
 @login_required
 def ordinarios_agregar(request):
     config = LibroConfig.objects.get(id=1)
-    if config.bloqueado:
+    items_per_page = request.GET.get('items_per_page', '10')
+    
+    # Verificar si el libro está bloqueado y el usuario no es el que lo bloqueó ni staff
+    if config.bloqueado and config.bloqueado_por != request.user and not request.user.is_staff:
         messages.error(request, 'El libro está bloqueado. No se pueden agregar registros.')
-        return redirect('ordinarios_lista')
+        return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}")
     
     if request.method == 'POST':
         data = request.POST
@@ -68,7 +79,6 @@ def ordinarios_agregar(request):
         materia = data.get('materia', '').strip()
         iddoc_input = data.get('iddoc', '').strip()
         
-        # Determinar el valor final de destinatario y su categoría
         if destinatario_select in ['Otro_Dentro', 'Otro_Fuera']:
             if not destinatario_custom:
                 messages.error(request, 'Por favor, especifique un destinatario personalizado.')
@@ -80,6 +90,7 @@ def ordinarios_agregar(request):
                     'config': config,
                     'active_tab': 'ordinarios',
                     'form_data': data,
+                    'items_per_page': items_per_page,
                 })
             destinatario = destinatario_custom
             es_municipio = True if destinatario_select == 'Otro_Dentro' else False
@@ -87,7 +98,6 @@ def ordinarios_agregar(request):
             destinatario = destinatario_select
             es_municipio = Destinatario.objects.get(nombre=destinatario).es_municipio
         
-        # Procesar los valores de iddoc
         iddoc_list = [idd.strip() for idd in iddoc_input.split(',') if idd.strip()]
         
         try:
@@ -134,122 +144,147 @@ def ordinarios_agregar(request):
         except ValueError as e:
             messages.error(request, f'Error en los datos: {str(e)}. Asegúrate de que "iddoc" sean números válidos separados por comas.')
         
-        return redirect('ordinarios_lista')
+        return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}")
     
-    return redirect('ordinarios_lista')
+    return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}")
 
 @login_required
 def ordinarios_editar(request, pk):
     ordinario = get_object_or_404(Ordinario, pk=pk)
-    if ordinario.autor != request.user.username[:10] and not request.user.is_staff:
-        messages.error(request, 'No tienes permiso para editar este ordinario.')
-        return redirect('ordinarios_lista')
+    items_per_page = request.GET.get('items_per_page', '10')
+    config = LibroConfig.objects.get(id=1)
+    
+    if config.bloqueado and config.bloqueado_por != request.user and not request.user.is_staff:
+        messages.error(request, 'El libro está bloqueado. No se pueden editar registros.')
+        return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}")
     
     if request.method == 'POST':
         data = request.POST
+        fecha = data.get('fecha')
+        iddoc = data.get('iddoc', '').strip()
+        destinatario = data.get('destinatario', '').strip()
+        materia = data.get('materia', '').strip()
+        
         try:
-            ordinario.fecha = data['fecha']
-            iddoc_str = data.get('iddoc', '').strip()
-            ordinario.iddoc = int(iddoc_str.replace('.', '')) if iddoc_str else None
-            ordinario.destinatario = data['destinatario']
-            ordinario.materia = data['materia']
+            ordinario.fecha = fecha
+            if iddoc:
+                ordinario.iddoc = int(iddoc.replace('.', '')) if iddoc else None
+            else:
+                ordinario.iddoc = None
+            ordinario.destinatario = destinatario
+            ordinario.materia = materia
+            
             ordinario.save()
             
             Auditoria.objects.create(
-                usuario=request.user, tipo='MODIFICAR', tabla='ordinarios',
-                registro_id=pk, detalles=f'Modificado ordinario {ordinario.numero}'
+                usuario=request.user,
+                tipo='EDITAR',
+                tabla='ordinarios',
+                registro_id=pk,
+                detalles=f'Ordinario {ordinario.numero} editado por {request.user.username}'
             )
             messages.success(request, f'Ordinario {ordinario.numero} editado correctamente.')
+            
+            page = get_page_for_ordinario(ordinario, items_per_page)
+            return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}&page={page}#ordinario-{ordinario.pk}")
+        
         except ValueError as e:
             messages.error(request, f'Error en los datos: {str(e)}. Asegúrate de que "iddoc" sea un número válido.')
-        
-        return redirect('ordinarios_lista')
     
-    return render(request, 'ordinarios/lista.html', {
-        'ordinario': ordinario,
-        'active_tab': 'ordinarios',
-    })
+    return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}")
 
 @login_required
 def ordinarios_anular(request, pk):
     ordinario = get_object_or_404(Ordinario, pk=pk)
-    usuario = request.user
-    if ordinario.autor != usuario.username[:10] and not usuario.is_staff:
-        messages.error(request, 'No tienes permiso para anular este ordinario.')
-        return redirect('ordinarios_lista')
+    items_per_page = request.GET.get('items_per_page', '10')
+    config = LibroConfig.objects.get(id=1)
     
-    if ordinario.anulada:
-        ordinario.anulada = False
-        accion = 'RESTAURAR'
-        detalles = f'Restaurado ordinario #{ordinario.numero}'
-    else:
-        ordinario.anulada = True
-        accion = 'ANULAR'
-        detalles = f'Anulado ordinario #{ordinario.numero}'
+    if config.bloqueado and config.bloqueado_por != request.user and not request.user.is_staff:
+        messages.error(request, 'El libro está bloqueado. No se pueden anular ni restaurar registros.')
+        return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}")
+    
+    if ordinario.autor != request.user.username[:10] and not request.user.is_staff:
+        messages.error(request, 'No tienes permiso para anular este ordinario.')
+        return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}")
+    
+    ordinario.anulada = not ordinario.anulada
     ordinario.save()
+    
+    accion = 'ANULADO' if ordinario.anulada else 'RESTAURADO'
     Auditoria.objects.create(
-        usuario=usuario, tipo=accion, tabla='ordinarios',
-        registro_id=pk, detalles=detalles
+        usuario=request.user,
+        tipo=accion,
+        tabla='ordinarios',
+        registro_id=pk,
+        detalles=f'Ordinario {ordinario.numero} {accion.lower()} por {request.user.username}'
     )
-    messages.success(request, f'Ordinario {ordinario.numero} {accion.lower()}do correctamente.')
-    return redirect('ordinarios_lista')
+    messages.success(request, f'Ordinario {ordinario.numero} {"anulado" if ordinario.anulada else "restaurado"} correctamente.')
+    
+    page = get_page_for_ordinario(ordinario, items_per_page)
+    return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}&page={page}#ordinario-{ordinario.pk}")
 
 @login_required
 def ordinarios_eliminar(request, pk):
-    config = LibroConfig.objects.get(id=1)
-    if config.bloqueado:
-        messages.error(request, 'El libro está bloqueado. No se pueden eliminar registros.')
-        return redirect('ordinarios_lista')
-    
     ordinario = get_object_or_404(Ordinario, pk=pk)
-    usuario = request.user
-    if ordinario.autor != usuario.username[:10]:
+    items_per_page = request.GET.get('items_per_page', '10')
+    config = LibroConfig.objects.get(id=1)
+    
+    # Verificar si el libro está bloqueado y el usuario no es el que lo bloqueó ni staff
+    if config.bloqueado and config.bloqueado_por != request.user and not request.user.is_staff:
+        messages.error(request, 'El libro está bloqueado. No se pueden eliminar registros.')
+        return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}")
+    
+    if ordinario.autor != request.user.username[:10] or ordinario != Ordinario.objects.order_by('-numero').first():
         messages.error(request, 'No tienes permiso para eliminar este ordinario.')
-        return redirect('ordinarios_lista')
+        return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}")
     
-    ultima_entrada = Ordinario.objects.filter(autor=usuario.username[:10]).order_by('-numero').first()
-    if not ultima_entrada or ordinario.pk != ultima_entrada.pk:
-        messages.error(request, 'Solo puedes eliminar la última entrada que creaste.')
-        return redirect('ordinarios_lista')
+    if request.method == 'POST':
+        numero = ordinario.numero
+        ordinario.delete()
+        
+        Auditoria.objects.create(
+            usuario=request.user,
+            tipo='ELIMINAR',
+            tabla='ordinarios',
+            registro_id=pk,
+            detalles=f'Ordinario {numero} eliminado por {request.user.username}'
+        )
+        messages.success(request, f'Ordinario {numero} eliminado correctamente.')
+        
+        return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}")
     
-    Auditoria.objects.create(
-        usuario=usuario,
-        tipo='ELIMINAR',
-        tabla='ordinarios',
-        registro_id=ordinario.pk,
-        detalles=f'Eliminado ordinario #{ordinario.numero}'
-    )
-    ordinario.delete()
-    messages.success(request, f'Ordinario {ordinario.numero} eliminado correctamente.')
-    return redirect('ordinarios_lista')
+    return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}")
 
 @login_required
 def ordinarios_bloquear(request):
-    config, created = LibroConfig.objects.get_or_create(id=1)
-    usuario = request.user
-    if config.bloqueado:
-        if config.bloqueado_por == usuario or usuario.is_staff:
-            config.bloqueado = False
-            config.bloqueado_por = None
-            config.save()
-            Auditoria.objects.create(
-                usuario=usuario,
-                tipo='DESBLOQUEAR',
-                tabla='ordinarios',
-                registro_id=1,
-                detalles='Libro de ordinarios desbloqueado'
-            )
-            messages.success(request, 'Libro de ordinarios desbloqueado.')
-    else:
-        config.bloqueado = True
-        config.bloqueado_por = usuario
+    config = LibroConfig.objects.get(id=1)
+    items_per_page = request.GET.get('items_per_page', '10')
+    
+    if config.bloqueado and config.bloqueado_por != request.user and not request.user.is_staff:
+        return render(request, 'ordinarios/lista.html', {
+            'ordinarios': Ordinario.objects.all(),
+            'items_per_page': items_per_page,
+            'fecha_actual': datetime.now().strftime('%Y-%m-%d'),
+            'destinatarios_dentro': Destinatario.objects.filter(es_municipio=True).order_by('orden'),
+            'destinatarios_fuera': Destinatario.objects.filter(es_municipio=False).order_by('orden'),
+            'config': config,
+            'active_tab': 'ordinarios',
+            'show_blocked_modal': True
+        })
+    
+    if request.method == 'POST':
+        config.bloqueado = not config.bloqueado
+        config.bloqueado_por = request.user if config.bloqueado else None
         config.save()
+        
+        accion = 'BLOQUEADO' if config.bloqueado else 'DESBLOQUEADO'
         Auditoria.objects.create(
-            usuario=usuario,
-            tipo='BLOQUEAR',
-            tabla='ordinarios',
+            usuario=request.user,
+            tipo=accion,
+            tabla='libro_config',
             registro_id=1,
-            detalles='Libro de ordinarios bloqueado'
+            detalles=f'Libro de ordinarios {accion.lower()} por {request.user.username}'
         )
-        messages.success(request, 'Libro de ordinarios bloqueado.')
-    return redirect('ordinarios_lista')
+        messages.success(request, f'Libro de ordinarios {"bloqueado" if config.bloqueado else "desbloqueado"} correctamente.')
+    
+    return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}")
