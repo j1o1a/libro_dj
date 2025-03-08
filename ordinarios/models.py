@@ -2,7 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 
 class Ordinario(models.Model):
-    numero = models.PositiveIntegerField("Nº Ordinario")  # Quitamos unique=True
+    numero = models.PositiveIntegerField("Nº Ordinario")
     fecha = models.DateField("Fecha")
     iddoc = models.PositiveIntegerField("IDDOC", null=True, blank=True)
     destinatario = models.CharField(max_length=100, blank=True)
@@ -15,10 +15,8 @@ class Ordinario(models.Model):
     class Meta:
         ordering = ['-numero']
 
+    # Sin lógica de numero en save(), se maneja en la vista
     def save(self, *args, **kwargs):
-        if not self.pk:
-            ultimo = Ordinario.objects.order_by('-numero').first()
-            self.numero = (ultimo.numero + 1) if ultimo else 1
         super().save(*args, **kwargs)
 
 class LibroConfig(models.Model):

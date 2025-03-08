@@ -66,7 +66,6 @@ def ordinarios_agregar(request):
     config = LibroConfig.objects.get(id=1)
     items_per_page = request.GET.get('items_per_page', '10')
     
-    # Verificar si el libro está bloqueado y el usuario no es el que lo bloqueó ni staff
     if config.bloqueado and config.bloqueado_por != request.user and not request.user.is_staff:
         messages.error(request, 'El libro está bloqueado. No se pueden agregar registros.')
         return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}")
@@ -93,16 +92,15 @@ def ordinarios_agregar(request):
                     'items_per_page': items_per_page,
                 })
             destinatario = destinatario_custom
-            es_municipio = True if destinatario_select == 'Otro_Dentro' else False
         else:
             destinatario = destinatario_select
-            es_municipio = Destinatario.objects.get(nombre=destinatario).es_municipio
         
         iddoc_list = [idd.strip() for idd in iddoc_input.split(',') if idd.strip()]
         
         try:
             with transaction.atomic():
-                ultimo = Ordinario.objects.order_by('-numero').first()
+                # Bloqueo para calcular el próximo número
+                ultimo = Ordinario.objects.select_for_update().order_by('-numero').first()
                 numero = (ultimo.numero + 1) if ultimo else 1
                 
                 registros = []
