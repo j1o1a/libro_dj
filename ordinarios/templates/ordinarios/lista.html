@@ -45,9 +45,9 @@
             <th class="text-center" style="width: 8%;">Fecha</th>
             <th class="text-center" style="width: 10%;">IDDOC</th>
             <th class="text-center" style="width: 17%;">Destinatario</th>
-            <th class="text-start" style="width: 37%;">Materia</th>
+            <th class="text-start" style="width: 42%;">Materia</th>
             <th class="text-center" style="width: 8%;">Autor</th>
-            <th class="text-end" style="width: 15%;">Acciones</th>
+            <th class="text-center" style="width: 10%;">Acciones</th>
         </tr>
     </thead>
     <tbody>
@@ -62,29 +62,10 @@
                     Sin IDDOC
                 {% endif %}
             </td>
-            <td class="text-center {% if o.anulada %}text-decoration-line-through{% endif %}">{{ o.destinatario|truncatechars:15|upper }}</td>
-            <td class="text-start {% if o.anulada %}text-decoration-line-through{% endif %}">{{ o.materia|truncatechars:50 }}</td>
+            <td class="text-center {% if o.anulada %}text-decoration-line-through{% endif %}" {% if o.destinatario|length > 15 %}data-bs-toggle="tooltip" data-bs-title="{{ o.destinatario }}"{% endif %}>{{ o.destinatario|truncatechars:15|upper }}</td>
+            <td class="text-start {% if o.anulada %}text-decoration-line-through{% endif %}" {% if o.materia|length > 65 %}data-bs-toggle="tooltip" data-bs-title="{{ o.materia }}"{% endif %}>{{ o.materia|truncatechars:65 }}</td>
             <td class="{% if o.anulada %}text-decoration-line-through{% endif %}">{{ o.autor|upper }}</td>
-            <td class="text-end">
-                {% if o.autor == user.username|slice:":10" or user.is_staff %}
-                {% if config.bloqueado and config.bloqueado_por != user and not user.is_staff %}
-                <span class="action-link text-muted"><i class="bi bi-pencil"></i></span><span class="action-link text-muted"><i class="bi bi-slash-circle"></i></span>
-                {% else %}
-                <a href="#" class="action-link text-decoration-none text-primary" data-bs-toggle="modal" data-bs-target="#editarModal{{ o.pk }}"><i class="bi bi-pencil"></i></a><a href="{% url 'ordinarios_anular' o.pk %}?items_per_page={{ items_per_page }}" class="action-link text-decoration-none text-danger"><i class="bi bi-slash-circle"></i></a>
-                {% endif %}
-                {% endif %}
-                {% if o.autor == user.username|slice:":10" %}
-                {% with ultima_entrada=ordinarios|first %}
-                {% if ultima_entrada and o.pk == ultima_entrada.pk %}
-                {% if config.bloqueado and config.bloqueado_por != user and not user.is_staff %}
-                <span class="action-link text-muted"><i class="bi bi-trash"></i></span>
-                {% else %}
-                <a href="#" class="action-link text-decoration-none text-danger" data-bs-toggle="modal" data-bs-target="#eliminarModal{{ o.pk }}"><i class="bi bi-trash"></i></a>
-                {% endif %}
-                {% endif %}
-                {% endwith %}
-                {% endif %}
-            </td>
+            <td class="text-center">{% if o.autor == user.username|slice:":10" or user.is_staff %}{% if config.bloqueado and config.bloqueado_por != user and not user.is_staff %}<span class="action-link text-muted" data-bs-toggle="tooltip" data-bs-title="Editar entrada (bloqueada)"><i class="bi bi-pencil"></i></span><span class="action-link text-muted" data-bs-toggle="tooltip" data-bs-title="Anular entrada (bloqueada)"><i class="bi bi-slash-circle"></i></span>{% else %}<span class="action-link" data-bs-toggle="tooltip" data-bs-title="Editar entrada"><a href="#" class="text-decoration-none text-primary" data-bs-toggle="modal" data-bs-target="#editarModal{{ o.pk }}"><i class="bi bi-pencil"></i></a></span><a href="{% url 'ordinarios_anular' o.pk %}?items_per_page={{ items_per_page }}" class="action-link text-decoration-none text-danger" data-bs-toggle="tooltip" data-bs-title="Anular entrada"><i class="bi bi-slash-circle"></i></a>{% endif %}{% endif %}{% if o.autor == user.username|slice:":10" %}{% with ultima_entrada=ordinarios|first %}{% if ultima_entrada and o.pk == ultima_entrada.pk %}{% if config.bloqueado and config.bloqueado_por != user and not user.is_staff %}<span class="action-link text-muted" data-bs-toggle="tooltip" data-bs-title="Borrar entrada (bloqueada)"><i class="bi bi-trash"></i></span>{% else %}<span class="action-link" data-bs-toggle="tooltip" data-bs-title="Eliminar entrada"><a href="#" class="text-decoration-none text-danger" data-bs-toggle="modal" data-bs-target="#eliminarModal{{ o.pk }}"><i class="bi bi-trash"></i></a></span>{% endif %}{% endif %}{% endwith %}{% endif %}</td>
         </tr>
         {% empty %}
         <tr>
@@ -308,9 +289,9 @@ document.addEventListener('DOMContentLoaded', function() {
         100% { opacity: 0.7; transform: scale(0.95); }
     }
     .action-link {
-        display: inline-block;
-        min-width: 60px; /* Ancho mínimo para alinear uniformemente */
-        text-align: center; /* Centrar el texto dentro del ancho */
+        display: inline; /* Sin espacios entre íconos */
+        margin: 0; /* Sin márgenes */
+        padding: 0 2px; /* Espaciado mínimo para clics */
     }
 </style>
 
@@ -346,8 +327,15 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => element.classList.remove('highlight'), 2000);
         }
     }
-});
 
+    // Inicialización de tooltips de Bootstrap 5
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+<script>
 document.styleSheets[0].insertRule(`
     .highlight {
         background-color: #fff3cd;
