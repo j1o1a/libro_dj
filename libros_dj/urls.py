@@ -12,4 +12,5 @@ urlpatterns = [
     path('memorandos/', include('memorandos.urls')),
     path('ajustes/', include('ajustes.urls')),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
+    path('__debug__/', include('debug_toolbar.urls')),
 ]

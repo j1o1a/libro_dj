@@ -9,45 +9,84 @@ from ordinarios.models import Ordinario, LibroConfig
 from destinatarios.models import Destinatario
 from auditoria.models import Auditoria
 from collections import Counter
+from django.db.models import Count, Subquery, OuterRef, Q, Case, When, BooleanField, Max
+from django.core.cache import cache
 
-# Función auxiliar para calcular la página de un ordinario
+# Función auxiliar optimizada para calcular la página de un ordinario
 def get_page_for_ordinario(ordinario, items_per_page):
-    ordinarios_list = Ordinario.objects.all().order_by('-numero', '-creada')
-    items_per_page_int = ordinarios_list.count() if items_per_page == 'all' else int(items_per_page)
-    paginator = Paginator(ordinarios_list, items_per_page_int)
-    position = next(i + 1 for i, o in enumerate(ordinarios_list) if o.pk == ordinario.pk)
-    page = (position - 1) // items_per_page_int + 1 if position > 0 else 1
+    items_per_page_int = int(items_per_page) if items_per_page != 'all' else Ordinario.objects.count()
+    count_before = Ordinario.objects.filter(numero__gt=ordinario.numero).count() + \
+                   Ordinario.objects.filter(numero=ordinario.numero, pk__gt=ordinario.pk).count()
+    page = (count_before // items_per_page_int) + 1 if count_before > 0 else 1
     return page
 
 @login_required
 def ordinarios_lista(request):
     items_per_page = request.GET.get('items_per_page', '10')
-    ordinarios_list = Ordinario.objects.all().order_by('-numero', '-creada')
     
-    conteo_por_numero = Counter(o.numero for o in ordinarios_list)
-    grupos = {}
+    # Consulta inicial con solo los campos necesarios
+    ordinarios_list = list(Ordinario.objects.only('pk', 'numero', 'iddoc', 'destinatario', 'materia', 'fecha', 'creada').order_by('-numero', '-creada'))
+    
+    # Usar ordinarios_list para construir grupos_datos y calcular atributos en una sola pasada
     grupos_datos = {}
+    latest_entries = {}
+    first_entries = {}
+    last_entries = {}
+    es_multiple_dict = {}
+    current_numero = None
+    items_for_numero = []
+    
     for o in ordinarios_list:
-        if o.numero not in grupos:
-            grupos[o.numero] = o
-            grupos_datos[o.numero] = {
-                'iddocs': ", ".join(str(ord.iddoc) for ord in Ordinario.objects.filter(numero=o.numero) if ord.iddoc),
-                'destinatarios': ", ".join(ord.destinatario for ord in Ordinario.objects.filter(numero=o.numero)),
-                'materia': o.materia,
-                'fecha': o.fecha.strftime('%Y-%m-%d'),
-            }
+        if o.numero != current_numero:
+            if current_numero is not None:
+                # Procesar el grupo anterior
+                latest_entry = max(items_for_numero, key=lambda x: (x.creada or datetime.min, x.pk))
+                first_entry = items_for_numero[0]
+                last_entry = items_for_numero[-1]
+                latest_entries[current_numero] = latest_entry.pk
+                first_entries[current_numero] = first_entry.pk
+                last_entries[current_numero] = last_entry.pk
+                unique_iddocs = len(set(obj.iddoc for obj in items_for_numero if obj.iddoc)) > 1
+                unique_destinatarios = len(set(obj.destinatario for obj in items_for_numero)) > 1
+                es_multiple_dict[current_numero] = unique_iddocs or unique_destinatarios
+                grupos_datos[current_numero] = {
+                    'iddocs': ", ".join(str(obj.iddoc) for obj in items_for_numero if obj.iddoc),
+                    'destinatarios': ", ".join(obj.destinatario for obj in items_for_numero),
+                    'materia': items_for_numero[0].materia,
+                    'fecha': items_for_numero[0].fecha.strftime('%Y-%m-%d') if items_for_numero[0].fecha else '',
+                }
+            current_numero = o.numero
+            items_for_numero = [o]
+        else:
+            items_for_numero.append(o)
     
-    previous_numero = None
-    next_ordinarios = list(ordinarios_list)[1:] + [None]
-    for i, o in enumerate(ordinarios_list):
-        o.es_mas_reciente = (o == grupos[o.numero])
-        o.es_multiple = conteo_por_numero[o.numero] > 1
-        o.is_first_in_group = (i == 0) or (previous_numero != o.numero)
-        o.is_last_in_group = (next_ordinarios[i] is None) or (next_ordinarios[i].numero != o.numero)
-        print(f"Numero={o.numero}, es_multiple={o.es_multiple}, first={o.is_first_in_group}, last={o.is_last_in_group}")  # Debug
-        previous_numero = o.numero
+    # Procesar el último grupo
+    if current_numero is not None and items_for_numero:
+        latest_entry = max(items_for_numero, key=lambda x: (x.creada or datetime.min, x.pk))
+        first_entry = items_for_numero[0]
+        last_entry = items_for_numero[-1]
+        latest_entries[current_numero] = latest_entry.pk
+        first_entries[current_numero] = first_entry.pk
+        last_entries[current_numero] = last_entry.pk
+        unique_iddocs = len(set(obj.iddoc for obj in items_for_numero if obj.iddoc)) > 1
+        unique_destinatarios = len(set(obj.destinatario for obj in items_for_numero)) > 1
+        es_multiple_dict[current_numero] = unique_iddocs or unique_destinatarios
+        grupos_datos[current_numero] = {
+            'iddocs': ", ".join(str(obj.iddoc) for obj in items_for_numero if obj.iddoc),
+            'destinatarios': ", ".join(obj.destinatario for obj in items_for_numero),
+            'materia': items_for_numero[0].materia,
+            'fecha': items_for_numero[0].fecha.strftime('%Y-%m-%d') if items_for_numero[0].fecha else '',
+        }
     
-    # Paginación (sin cambios)
+    # Asignar atributos a los objetos
+    for o in ordinarios_list:
+        o.es_mas_reciente = (o.pk == latest_entries.get(o.numero))
+        o.es_multiple = es_multiple_dict.get(o.numero, False)
+        o.is_first_in_group = (o.pk == first_entries.get(o.numero))
+        o.is_last_in_group = (o.pk == last_entries.get(o.numero))
+        # print(f"Numero={o.numero}, es_multiple={o.es_multiple}, es_mas_reciente={o.es_mas_reciente}, first={o.is_first_in_group}, last={o.is_last_in_group}")  # Debug (comentado)
+    
+    # Paginación
     if items_per_page == 'all':
         paginated_ordinarios = ordinarios_list
         page_obj = None
@@ -70,10 +109,21 @@ def ordinarios_lista(request):
         
         page_obj = paginated_ordinarios
     
-    fecha_actual = datetime.now().strftime('%Y-%m-%d')
-    destinatarios_dentro = Destinatario.objects.filter(es_municipio=True).order_by('orden')
-    destinatarios_fuera = Destinatario.objects.filter(es_municipio=False).order_by('orden')
+    # Usar caché para destinatarios_dentro y destinatarios_fuera
+    cache_key = 'destinatarios_ordinarios'
+    destinatarios_cached = cache.get(cache_key)
+    if destinatarios_cached is None:
+        destinatarios_dentro = list(Destinatario.objects.filter(es_municipio=True).order_by('orden'))
+        destinatarios_fuera = list(Destinatario.objects.filter(es_municipio=False).order_by('orden'))
+        cache.set(cache_key, {'dentro': destinatarios_dentro, 'fuera': destinatarios_fuera}, timeout=3600)
+    else:
+        destinatarios_dentro = destinatarios_cached['dentro']
+        destinatarios_fuera = destinatarios_cached['fuera']
+    
+    # Consultar config directamente sin caché
     config, created = LibroConfig.objects.get_or_create(id=1)
+    
+    fecha_actual = datetime.now().strftime('%Y-%m-%d')
     
     return render(request, 'ordinarios/lista.html', {
         'ordinarios': paginated_ordinarios,
@@ -87,6 +137,7 @@ def ordinarios_lista(request):
         'grupos_datos': grupos_datos,
     })
 
+# Resto del archivo (ordinarios_agregar, ordinarios_editar, etc.) sin cambios
 @login_required
 def ordinarios_agregar(request):
     config = LibroConfig.objects.get(id=1)
@@ -180,8 +231,11 @@ def ordinarios_editar(request, pk):
         iddoc_input = data.get('iddoc', '').strip()
         materia = data.get('materia', '').strip()
         
+        # Procesar iddoc
         iddoc_list = [idd.strip() for idd in iddoc_input.split(',') if idd.strip()] or [None]
+        iddoc_list = [int(idd.replace('.', '')) if idd else None for idd in iddoc_list]  # Convertir a int o None
         
+        # Procesar destinatarios
         destinatarios = []
         i = 1
         while f'destinatario_select_{i}' in data:
@@ -195,12 +249,16 @@ def ordinarios_editar(request, pk):
         if not destinatarios:
             destinatarios = [ordinario.destinatario]
         
+        # Alinear el número de entradas con el mínimo entre iddoc_list y destinatarios
+        num_entries = max(1, min(len(iddoc_list), len(destinatarios)))
+        
         with transaction.atomic():
-            grupo_ordinarios.delete()
-            for i in range(max(len(iddoc_list), len(destinatarios))):
+            grupo_ordinarios.delete()  # Eliminar todas las entradas existentes
+            registros = []
+            for i in range(num_entries):
                 iddoc = iddoc_list[i] if i < len(iddoc_list) else iddoc_list[-1] if iddoc_list else None
                 destinatario = destinatarios[i] if i < len(destinatarios) else destinatarios[-1]
-                Ordinario.objects.create(
+                ordinario_new = Ordinario(
                     numero=ordinario.numero,
                     fecha=fecha,
                     iddoc=iddoc,
@@ -209,6 +267,8 @@ def ordinarios_editar(request, pk):
                     autor=ordinario.autor,
                     creada=ordinario.creada
                 )
+                registros.append(ordinario_new)
+            Ordinario.objects.bulk_create(registros)
         
         messages.success(request, f'Ordinario {ordinario.numero} editado correctamente.')
         return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}")
