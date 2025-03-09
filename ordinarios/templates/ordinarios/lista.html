@@ -203,57 +203,91 @@
 <!-- Modales de Edición -->
 {% for o in ordinarios %}
 {% if o.es_mas_reciente %}
-<div class="modal fade" id="editarModal{{ o.numero }}" tabindex="-1" aria-labelledby="editarModalLabel{{ o.numero }}" aria-hidden="true">
+<div class="modal fade" id="editarModal{{ o.numero }}" tabindex="-1" aria-labelledby="editarModalLabel{{ o.numero }}" aria-hidden="true" {% if show_edit_modal == o.numero %}data-bs-backdrop="static" data-bs-keyboard="false"{% endif %}>
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="post" action="{% url 'ordinarios_editar' o.pk %}?items_per_page={{ items_per_page }}">
+            <form method="post" action="{% url 'ordinarios_editar' o.pk %}?items_per_page={{ items_per_page }}&page={{ page_obj.number }}">
                 {% csrf_token %}
                 <div class="modal-header bg-primary text-white small">
                     <h5 class="modal-title" id="editarModalLabel{{ o.numero }}">Editar Ordinario {{ o.numero }}</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
+                    {% if messages %}
+                    {% for message in messages %}
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
                     <div class="mb-3">
                         <label for="fecha{{ o.numero }}" class="form-label">Fecha</label>
-                        <input type="date" name="fecha" id="fecha{{ o.numero }}" class="form-control" value="{{ grupos_datos|lookup:o.numero|lookup:'fecha' }}" required>
+                        <input type="date" name="fecha" id="fecha{{ o.numero }}" class="form-control" value="{% if form_data and form_data.fecha %}{{ form_data.fecha }}{% else %}{{ grupos_datos|lookup:o.numero|lookup:'fecha' }}{% endif %}" required>
                     </div>
                     <div class="mb-3">
                         <label for="iddoc{{ o.numero }}" class="form-label">IDDOC</label>
-                        <input type="text" name="iddoc" id="iddoc{{ o.numero }}" class="form-control" value="{{ grupos_datos|lookup:o.numero|lookup:'iddocs' }}" placeholder="Ej: 1234567, 7890123">
+                        <input type="text" name="iddoc" id="iddoc{{ o.numero }}" class="form-control" value="{% if form_data and form_data.iddoc %}{{ form_data.iddoc }}{% else %}{{ grupos_datos|lookup:o.numero|lookup:'iddocs' }}{% endif %}" placeholder="Ej: 1234567, 7890123">
                     </div>
                     <div id="editar-destinatarios-container-{{ o.numero }}">
-                        {% for ord in ordinarios %}
-                        {% if ord.numero == o.numero %}
-                        <div class="mb-3 destinatario-group" data-index="{{ forloop.counter }}">
-                            <label for="destinatario_select_{{ o.numero }}_{{ forloop.counter }}" class="form-label">Destinatario</label>
-                            <select name="destinatario_select_{{ forloop.counter }}" id="destinatario_select_{{ o.numero }}_{{ forloop.counter }}" class="form-select destinatario-select" required>
-                                <option value="" disabled>Seleccione un destinatario</option>
-                                <optgroup label="Dentro del Municipio">
-                                    {% for destinatario in destinatarios_dentro %}
-                                    <option value="{{ destinatario.nombre }}" {% if ord.destinatario == destinatario.nombre %}selected{% endif %}>{{ destinatario.nombre }}</option>
-                                    {% endfor %}
-                                    <option value="Otro_Dentro" {% if ord.destinatario not in destinatarios_dentro|lookup:'nombre' and ord.destinatario not in destinatarios_fuera|lookup:'nombre' %}selected{% endif %}>Otro (Especificar)</option>
-                                </optgroup>
-                                <optgroup label="Fuera del Municipio">
-                                    {% for destinatario in destinatarios_fuera %}
-                                    <option value="{{ destinatario.nombre }}" {% if ord.destinatario == destinatario.nombre %}selected{% endif %}>{{ destinatario.nombre }}</option>
-                                    {% endfor %}
-                                    <option value="Otro_Fuera" {% if ord.destinatario not in destinatarios_dentro|lookup:'nombre' and ord.destinatario not in destinatarios_fuera|lookup:'nombre' %}selected{% endif %}>Otro (Especificar)</option>
-                                </optgroup>
-                            </select>
-                            <div class="mt-2" id="destinatario_custom_{{ o.numero }}_{{ forloop.counter }}_div" style="display: {% if ord.destinatario not in destinatarios_dentro|lookup:'nombre' and ord.destinatario not in destinatarios_fuera|lookup:'nombre' %}block{% else %}none{% endif %};">
-                                <label for="destinatario_custom_{{ o.numero }}_{{ forloop.counter }}" class="form-label">Especifique otro destinatario</label>
-                                <input type="text" name="destinatario_custom_{{ forloop.counter }}" id="destinatario_custom_{{ o.numero }}_{{ forloop.counter }}" class="form-control" maxlength="100" value="{% if ord.destinatario not in destinatarios_dentro|lookup:'nombre' and ord.destinatario not in destinatarios_fuera|lookup:'nombre' %}{{ ord.destinatario }}{% endif %}" {% if ord.destinatario not in destinatarios_dentro|lookup:'nombre' and ord.destinatario not in destinatarios_fuera|lookup:'nombre' %}required{% endif %}>
+                        {% if form_data and form_data.destinatarios %}
+                            {% for dest in form_data.destinatarios %}
+                            <div class="mb-3 destinatario-group" data-index="{{ forloop.counter }}">
+                                <label for="destinatario_select_{{ o.numero }}_{{ forloop.counter }}" class="form-label">Destinatario</label>
+                                <select name="destinatario_select_{{ forloop.counter }}" id="destinatario_select_{{ o.numero }}_{{ forloop.counter }}" class="form-select destinatario-select" required>
+                                    <option value="" disabled>Seleccione un destinatario</option>
+                                    <optgroup label="Dentro del Municipio">
+                                        {% for destinatario in destinatarios_dentro %}
+                                        <option value="{{ destinatario.nombre }}" {% if dest.select_value == destinatario.nombre %}selected{% endif %}>{{ destinatario.nombre }}</option>
+                                        {% endfor %}
+                                        <option value="Otro_Dentro" {% if dest.select_value == "Otro_Dentro" %}selected{% endif %}>Otro (Especificar)</option>
+                                    </optgroup>
+                                    <optgroup label="Fuera del Municipio">
+                                        {% for destinatario in destinatarios_fuera %}
+                                        <option value="{{ destinatario.nombre }}" {% if dest.select_value == destinatario.nombre %}selected{% endif %}>{{ destinatario.nombre }}</option>
+                                        {% endfor %}
+                                        <option value="Otro_Fuera" {% if dest.select_value == "Otro_Fuera" %}selected{% endif %}>Otro (Especificar)</option>
+                                    </optgroup>
+                                </select>
+                                <div class="mt-2" id="destinatario_custom_{{ o.numero }}_{{ forloop.counter }}_div" style="display: {% if dest.select_value == 'Otro_Dentro' or dest.select_value == 'Otro_Fuera' %}block{% else %}none{% endif %};">
+                                    <label for="destinatario_custom_{{ o.numero }}_{{ forloop.counter }}" class="form-label">Especifique otro destinatario</label>
+                                    <input type="text" name="destinatario_custom_{{ forloop.counter }}" id="destinatario_custom_{{ o.numero }}_{{ forloop.counter }}" class="form-control" maxlength="100" value="{{ dest.custom_value }}" {% if dest.select_value == 'Otro_Dentro' or dest.select_value == 'Otro_Fuera' %}required{% endif %}>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-danger mt-2 remove-destinatario">Eliminar</button>
                             </div>
-                            <button type="button" class="btn btn-sm btn-outline-danger mt-2 remove-destinatario">Eliminar</button>
-                        </div>
+                            {% endfor %}
+                        {% else %}
+                            {% for entry in edit_data|lookup:o.numero %}
+                            <div class="mb-3 destinatario-group" data-index="{{ forloop.counter }}">
+                                <label for="destinatario_select_{{ o.numero }}_{{ forloop.counter }}" class="form-label">Destinatario</label>
+                                <select name="destinatario_select_{{ forloop.counter }}" id="destinatario_select_{{ o.numero }}_{{ forloop.counter }}" class="form-select destinatario-select" required>
+                                    <option value="" disabled>Seleccione un destinatario</option>
+                                    <optgroup label="Dentro del Municipio">
+                                        {% for destinatario in destinatarios_dentro %}
+                                        <option value="{{ destinatario.nombre }}" {% if entry.destinatario == destinatario.nombre %}selected{% endif %}>{{ destinatario.nombre }}</option>
+                                        {% endfor %}
+                                        <option value="Otro_Dentro" {% if entry.destinatario not in destinatarios_dentro|lookup:'nombre' and entry.destinatario not in destinatarios_fuera|lookup:'nombre' %}selected{% endif %}>Otro (Especificar)</option>
+                                    </optgroup>
+                                    <optgroup label="Fuera del Municipio">
+                                        {% for destinatario in destinatarios_fuera %}
+                                        <option value="{{ destinatario.nombre }}" {% if entry.destinatario == destinatario.nombre %}selected{% endif %}>{{ destinatario.nombre }}</option>
+                                        {% endfor %}
+                                        <option value="Otro_Fuera" {% if entry.destinatario not in destinatarios_dentro|lookup:'nombre' and entry.destinatario not in destinatarios_fuera|lookup:'nombre' %}selected{% endif %}>Otro (Especificar)</option>
+                                    </optgroup>
+                                </select>
+                                <div class="mt-2" id="destinatario_custom_{{ o.numero }}_{{ forloop.counter }}_div" style="display: {% if entry.destinatario not in destinatarios_dentro|lookup:'nombre' and entry.destinatario not in destinatarios_fuera|lookup:'nombre' %}block{% else %}none{% endif %};">
+                                    <label for="destinatario_custom_{{ o.numero }}_{{ forloop.counter }}" class="form-label">Especifique otro destinatario</label>
+                                    <input type="text" name="destinatario_custom_{{ forloop.counter }}" id="destinatario_custom_{{ o.numero }}_{{ forloop.counter }}" class="form-control" maxlength="100" value="{% if entry.destinatario not in destinatarios_dentro|lookup:'nombre' and entry.destinatario not in destinatarios_fuera|lookup:'nombre' %}{{ entry.destinatario }}{% endif %}" {% if entry.destinatario not in destinatarios_dentro|lookup:'nombre' and entry.destinatario not in destinatarios_fuera|lookup:'nombre' %}required{% endif %}>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-danger mt-2 remove-destinatario">Eliminar</button>
+                            </div>
+                            {% endfor %}
                         {% endif %}
-                        {% endfor %}
                     </div>
                     <button type="button" class="btn btn-sm btn-outline-primary mb-3" id="edit-add-destinatario-{{ o.numero }}">Agregar nuevo destinatario</button>
                     <div class="mb-3">
                         <label for="materia{{ o.numero }}" class="form-label">Materia</label>
-                        <textarea name="materia" id="materia{{ o.numero }}" class="form-control" maxlength="5000" rows="4" required>{{ grupos_datos|lookup:o.numero|lookup:'materia' }}</textarea>
+                        <textarea name="materia" id="materia{{ o.numero }}" class="form-control" maxlength="5000" rows="4" required>{% if form_data and form_data.materia %}{{ form_data.materia }}{% else %}{{ grupos_datos|lookup:o.numero|lookup:'materia' }}{% endif %}</textarea>
                     </div>
                 </div>
                 <div class="modal-footer justify-content-center gap-2">
@@ -429,6 +463,7 @@ document.addEventListener('DOMContentLoaded', function() {
         container.appendChild(newGroup);
         attachSelectListener(newGroup.querySelector('.destinatario-select'), index, prefix);
         newGroup.querySelector('.remove-destinatario').addEventListener('click', function() {
+            reindexDestinatarios(containerId, prefix);
             newGroup.remove();
         });
     }
@@ -455,6 +490,25 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    function reindexDestinatarios(containerId, prefix) {
+        var container = document.getElementById(containerId);
+        var groups = container.getElementsByClassName('destinatario-group');
+        Array.from(groups).forEach((group, idx) => {
+            var newIndex = idx + 1;
+            group.dataset.index = newIndex;
+            group.querySelector('label').setAttribute('for', `${prefix}_destinatario_select_${newIndex}`);
+            group.querySelector('select').setAttribute('id', `${prefix}_destinatario_select_${newIndex}`);
+            group.querySelector('select').setAttribute('name', `destinatario_select_${newIndex}`);
+            var customDiv = group.querySelector(`#${prefix}_destinatario_custom_${group.dataset.index}_div`);
+            if (customDiv) {
+                customDiv.id = `${prefix}_destinatario_custom_${newIndex}_div`;
+                customDiv.querySelector('label').setAttribute('for', `${prefix}_destinatario_custom_${newIndex}`);
+                customDiv.querySelector('input').setAttribute('id', `${prefix}_destinatario_custom_${newIndex}`);
+                customDiv.querySelector('input').setAttribute('name', `destinatario_custom_${newIndex}`);
+            }
+        });
+    }
+
     addButton.addEventListener('click', function() {
         addDestinatario('destinatarios-container', 'agregar');
     });
@@ -474,7 +528,14 @@ document.addEventListener('DOMContentLoaded', function() {
         var removeButtons = editContainer.getElementsByClassName('remove-destinatario');
         Array.from(removeButtons).forEach(function(button) {
             button.addEventListener('click', function() {
-                this.parentElement.remove();
+                console.log('Eliminando destinatario para ordinario {{ o.numero }}'); // Depuración
+                var parent = this.parentElement;
+                if (parent) {
+                    reindexDestinatarios('editar-destinatarios-container-{{ o.numero }}', 'edit_{{ o.numero }}');
+                    parent.remove();
+                } else {
+                    console.error('No se encontró el elemento padre para eliminar');
+                }
             });
         });
 

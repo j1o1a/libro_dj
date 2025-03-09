@@ -14,6 +14,9 @@ class Ordinario(models.Model):
 
     class Meta:
         ordering = ['-numero']
+        indexes = [
+            models.Index(fields=['numero', 'creada']),
+        ]
 
     # Sin lógica de numero en save(), se maneja en la vista
     def save(self, *args, **kwargs):
