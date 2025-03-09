@@ -12,7 +12,7 @@ from collections import Counter
 
 # Función auxiliar para calcular la página de un ordinario
 def get_page_for_ordinario(ordinario, items_per_page):
-    ordinarios_list = Ordinario.objects.all().order_by('-numero', '-creada')  # Orden consistente
+    ordinarios_list = Ordinario.objects.all().order_by('-numero', '-creada')
     items_per_page_int = ordinarios_list.count() if items_per_page == 'all' else int(items_per_page)
     paginator = Paginator(ordinarios_list, items_per_page_int)
     position = next(i + 1 for i, o in enumerate(ordinarios_list) if o.pk == ordinario.pk)
@@ -24,15 +24,12 @@ def ordinarios_lista(request):
     items_per_page = request.GET.get('items_per_page', '10')
     ordinarios_list = Ordinario.objects.all().order_by('-numero', '-creada')
     
-    # Contar registros por número para determinar entradas múltiples
     conteo_por_numero = Counter(o.numero for o in ordinarios_list)
-    
-    # Identificar la entrada más reciente de cada grupo y preparar datos combinados
     grupos = {}
     grupos_datos = {}
     for o in ordinarios_list:
         if o.numero not in grupos:
-            grupos[o.numero] = o  # Entrada más reciente
+            grupos[o.numero] = o
             grupos_datos[o.numero] = {
                 'iddocs': ", ".join(str(ord.iddoc) for ord in Ordinario.objects.filter(numero=o.numero) if ord.iddoc),
                 'destinatarios': ", ".join(ord.destinatario for ord in Ordinario.objects.filter(numero=o.numero)),
@@ -40,12 +37,17 @@ def ordinarios_lista(request):
                 'fecha': o.fecha.strftime('%Y-%m-%d'),
             }
     
-    # Añadir atributos es_mas_reciente y es_multiple
-    for o in ordinarios_list:
+    previous_numero = None
+    next_ordinarios = list(ordinarios_list)[1:] + [None]
+    for i, o in enumerate(ordinarios_list):
         o.es_mas_reciente = (o == grupos[o.numero])
         o.es_multiple = conteo_por_numero[o.numero] > 1
+        o.is_first_in_group = (i == 0) or (previous_numero != o.numero)
+        o.is_last_in_group = (next_ordinarios[i] is None) or (next_ordinarios[i].numero != o.numero)
+        print(f"Numero={o.numero}, es_multiple={o.es_multiple}, first={o.is_first_in_group}, last={o.is_last_in_group}")  # Debug
+        previous_numero = o.numero
     
-    # Paginación
+    # Paginación (sin cambios)
     if items_per_page == 'all':
         paginated_ordinarios = ordinarios_list
         page_obj = None
@@ -57,7 +59,7 @@ def ordinarios_lista(request):
             items_per_page = '10'
         
         paginator = Paginator(ordinarios_list, items_per_page_int)
-        page = request.GET.get('page', 1)
+        page = request.GET.get('page', '1')
         
         try:
             paginated_ordinarios = paginator.page(page)
@@ -68,7 +70,6 @@ def ordinarios_lista(request):
         
         page_obj = paginated_ordinarios
     
-    # Datos adicionales para el contexto
     fecha_actual = datetime.now().strftime('%Y-%m-%d')
     destinatarios_dentro = Destinatario.objects.filter(es_municipio=True).order_by('orden')
     destinatarios_fuera = Destinatario.objects.filter(es_municipio=False).order_by('orden')
@@ -83,7 +84,7 @@ def ordinarios_lista(request):
         'destinatarios_fuera': destinatarios_fuera,
         'config': config,
         'active_tab': 'ordinarios',
-        'grupos_datos': grupos_datos,  # Datos combinados para los modales de edición
+        'grupos_datos': grupos_datos,
     })
 
 @login_required
@@ -129,7 +130,7 @@ def ordinarios_agregar(request):
                 destinatarios.append(select_value)
             i += 1
         
-        iddoc_list = [idd.strip() for idd in iddoc_input.split(',') if idd.strip()] or [None]  # Si no hay iddoc, usar None
+        iddoc_list = [idd.strip() for idd in iddoc_input.split(',') if idd.strip()] or [None]
         
         try:
             with transaction.atomic():
@@ -179,58 +180,35 @@ def ordinarios_editar(request, pk):
         iddoc_input = data.get('iddoc', '').strip()
         materia = data.get('materia', '').strip()
         
-        # Dividir iddoc en una lista, manejando el caso vacío
         iddoc_list = [idd.strip() for idd in iddoc_input.split(',') if idd.strip()] or [None]
         
-        # Obtener destinatarios del formulario
         destinatarios = []
-        for i in range(1, len(grupo_ordinarios) + 1):  # Máximo basado en registros existentes
-            select_key = f'destinatario_select_{i}'
-            custom_key = f'destinatario_custom_{i}'
-            select_value = data.get(select_key)
-            custom_value = data.get(custom_key, '').strip()
-            if select_value and select_value in ['Otro_Dentro', 'Otro_Fuera'] and custom_value:
+        i = 1
+        while f'destinatario_select_{i}' in data:
+            select_value = data.get(f'destinatario_select_{i}', '').strip()
+            custom_value = data.get(f'destinatario_custom_{i}', '').strip()
+            if select_value in ['Otro_Dentro', 'Otro_Fuera'] and custom_value:
                 destinatarios.append(custom_value)
-            elif select_value and select_value not in ['Otro_Dentro', 'Otro_Fuera']:
+            elif select_value:
                 destinatarios.append(select_value)
-            if not select_value:  # Si no hay más destinatarios enviados, paramos
-                break
+            i += 1
+        if not destinatarios:
+            destinatarios = [ordinario.destinatario]
         
-        # Actualizar o eliminar registros según los datos enviados
         with transaction.atomic():
-            # Si solo hay un iddoc y un destinatario
-            if len(iddoc_list) == 1 and len(destinatarios) == 1:
-                # Actualizar el primer registro y eliminar los demás
-                o = grupo_ordinarios[0]
-                o.fecha = fecha
-                o.iddoc = iddoc_list[0]
-                o.destinatario = destinatarios[0]
-                o.materia = materia
-                o.save()
-                # Eliminar registros sobrantes
-                grupo_ordinarios.exclude(pk=o.pk).delete()
-            else:
-                # Actualizar todos los registros existentes o crear nuevos si faltan
-                for i, o in enumerate(grupo_ordinarios):
-                    if i < len(iddoc_list) and i < len(destinatarios):
-                        o.fecha = fecha
-                        o.iddoc = iddoc_list[i]
-                        o.destinatario = destinatarios[i]
-                        o.materia = materia
-                        o.save()
-                    else:
-                        o.delete()  # Eliminar registros sobrantes si hay menos datos
-                # Crear nuevos registros si hay más datos que registros existentes
-                for i in range(len(grupo_ordinarios), min(len(iddoc_list), len(destinatarios))):
-                    Ordinario.objects.create(
-                        numero=ordinario.numero,
-                        fecha=fecha,
-                        iddoc=iddoc_list[i] if i < len(iddoc_list) else None,
-                        destinatario=destinatarios[i],
-                        materia=materia,
-                        autor=ordinario.autor,
-                        creada=ordinario.creada  # Mantener la fecha original si es necesario
-                    )
+            grupo_ordinarios.delete()
+            for i in range(max(len(iddoc_list), len(destinatarios))):
+                iddoc = iddoc_list[i] if i < len(iddoc_list) else iddoc_list[-1] if iddoc_list else None
+                destinatario = destinatarios[i] if i < len(destinatarios) else destinatarios[-1]
+                Ordinario.objects.create(
+                    numero=ordinario.numero,
+                    fecha=fecha,
+                    iddoc=iddoc,
+                    destinatario=destinatario,
+                    materia=materia,
+                    autor=ordinario.autor,
+                    creada=ordinario.creada
+                )
         
         messages.success(request, f'Ordinario {ordinario.numero} editado correctamente.')
         return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}")

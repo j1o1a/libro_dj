@@ -28,7 +28,7 @@
     </div>
     <div class="d-flex align-items-center">
         <label for="items_per_page" class="me-2 small">Ítems por página:</label>
-        <select name="items_per_page" id="items_per_page" class="form-select form-select-sm" style="width: auto;" onchange="window.location.href='?items_per_page='+this.value{% if page_obj %}+'&page={{ page_obj.number }}'{% endif %}">
+        <select name="items_per_page" id="items_per_page" class="form-select form-select-sm" style="width: auto;" onchange="window.location.href='?items_per_page=' + this.value + '{% if page_obj %}&page={{ page_obj.number }}{% endif %}'">
             <option value="10" {% if items_per_page == '10' %}selected{% endif %}>10</option>
             <option value="20" {% if items_per_page == '20' %}selected{% endif %}>20</option>
             <option value="50" {% if items_per_page == '50' %}selected{% endif %}>50</option>
@@ -52,7 +52,8 @@
     </thead>
     <tbody>
         {% for o in ordinarios %}
-        <tr class="text-center" id="ordinario-{{ o.pk }}">
+        <tr class="text-center {% if o.es_multiple %}multiple-entry numero-{{ o.numero }}{% if o.is_first_in_group %} first-in-group{% endif %}{% if o.is_last_in_group %} last-in-group{% endif %}{% endif %}" id="ordinario-{{ o.pk }}">
+            <!-- Debug: es_multiple={{ o.es_multiple }}, is_first_in_group={{ o.is_first_in_group }}, is_last_in_group={{ o.is_last_in_group }} -->
             {% if o.es_mas_reciente %}
             <td class="fw-bold {% if o.anulada %}text-decoration-line-through{% endif %}">
                 {{ o.numero }}
@@ -249,6 +250,7 @@
                         {% endif %}
                         {% endfor %}
                     </div>
+                    <button type="button" class="btn btn-sm btn-outline-primary mb-3" id="edit-add-destinatario-{{ o.numero }}">Agregar nuevo destinatario</button>
                     <div class="mb-3">
                         <label for="materia{{ o.numero }}" class="form-label">Materia</label>
                         <textarea name="materia" id="materia{{ o.numero }}" class="form-control" maxlength="5000" rows="4" required>{{ grupos_datos|lookup:o.numero|lookup:'materia' }}</textarea>
@@ -357,6 +359,13 @@ document.addEventListener('DOMContentLoaded', function() {
         margin: 0;
         padding: 0 2px;
     }
+    /* Estilos básicos para la tabla */
+    .table.table-bordered {
+        border-collapse: collapse;
+    }
+    .table.table-bordered td {
+        border: 1px solid #dee2e6 !important;
+    }
 </style>
 
 <script>
@@ -376,19 +385,27 @@ document.addEventListener('DOMContentLoaded', function() {
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
 
-    // Lógica para el modal de agregar
+    var alerts = document.querySelectorAll('.alert');
+    alerts.forEach(function(alert) {
+        setTimeout(function() {
+            var bsAlert = new bootstrap.Alert(alert);
+            bsAlert.close();
+        }, 5000);
+    });
+
     var container = document.getElementById('destinatarios-container');
     var addButton = document.getElementById('add-destinatario');
     var index = 1;
 
-    function addDestinatario() {
+    function addDestinatario(containerId, prefix) {
         index++;
+        var container = document.getElementById(containerId);
         var newGroup = document.createElement('div');
         newGroup.className = 'mb-3 destinatario-group';
         newGroup.dataset.index = index;
         newGroup.innerHTML = `
-            <label for="destinatario_select_${index}" class="form-label">Destinatario</label>
-            <select name="destinatario_select_${index}" id="destinatario_select_${index}" class="form-select destinatario-select" required>
+            <label for="${prefix}_destinatario_select_${index}" class="form-label">Destinatario</label>
+            <select name="destinatario_select_${index}" id="${prefix}_destinatario_select_${index}" class="form-select destinatario-select" required>
                 <option value="" disabled selected>Seleccione un destinatario</option>
                 <optgroup label="Dentro del Municipio">
                     {% for destinatario in destinatarios_dentro %}
@@ -403,24 +420,24 @@ document.addEventListener('DOMContentLoaded', function() {
                     <option value="Otro_Fuera">Otro (Especificar)</option>
                 </optgroup>
             </select>
-            <div class="mt-2" id="destinatario_custom_${index}_div" style="display: none;">
-                <label for="destinatario_custom_${index}" class="form-label">Especifique otro destinatario</label>
-                <input type="text" name="destinatario_custom_${index}" id="destinatario_custom_${index}" class="form-control" maxlength="100">
+            <div class="mt-2" id="${prefix}_destinatario_custom_${index}_div" style="display: none;">
+                <label for="${prefix}_destinatario_custom_${index}" class="form-label">Especifique otro destinatario</label>
+                <input type="text" name="destinatario_custom_${index}" id="${prefix}_destinatario_custom_${index}" class="form-control" maxlength="100">
             </div>
             <button type="button" class="btn btn-sm btn-outline-danger mt-2 remove-destinatario">Eliminar</button>
         `;
         container.appendChild(newGroup);
-        attachSelectListener(newGroup.querySelector('.destinatario-select'), index);
+        attachSelectListener(newGroup.querySelector('.destinatario-select'), index, prefix);
         newGroup.querySelector('.remove-destinatario').addEventListener('click', function() {
             newGroup.remove();
         });
     }
 
-    function attachSelectListener(select, idx) {
+    function attachSelectListener(select, idx, prefix) {
         select.addEventListener('change', function() {
-            var customDiv = document.getElementById(`destinatario_custom_${idx}_div`);
-            var customInput = document.getElementById(`destinatario_custom_${idx}`);
-            var customLabel = document.querySelector(`label[for="destinatario_custom_${idx}"]`);
+            var customDiv = document.getElementById(`${prefix}_destinatario_custom_${idx}_div`);
+            var customInput = document.getElementById(`${prefix}_destinatario_custom_${idx}`);
+            var customLabel = document.querySelector(`label[for="${prefix}_destinatario_custom_${idx}"]`);
             if (this.value === 'Otro_Dentro') {
                 customDiv.style.display = 'block';
                 customInput.setAttribute('required', 'required');
@@ -438,14 +455,22 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    addButton.addEventListener('click', addDestinatario);
-    attachSelectListener(document.getElementById('destinatario_select_1'), 1);
+    addButton.addEventListener('click', function() {
+        addDestinatario('destinatarios-container', 'agregar');
+    });
+    attachSelectListener(document.getElementById('destinatario_select_1'), 1, 'agregar');
 
-    // Lógica para eliminar destinatarios en el modal de edición
     {% for o in ordinarios %}
     {% if o.es_mas_reciente %}
     (function() {
+        var editAddButton = document.getElementById('edit-add-destinatario-{{ o.numero }}');
         var editContainer = document.getElementById('editar-destinatarios-container-{{ o.numero }}');
+        var editIndex = {{ ordinarios|filter_by_numero:o.numero|length }};
+
+        editAddButton.addEventListener('click', function() {
+            addDestinatario('editar-destinatarios-container-{{ o.numero }}', 'edit_{{ o.numero }}');
+        });
+
         var removeButtons = editContainer.getElementsByClassName('remove-destinatario');
         Array.from(removeButtons).forEach(function(button) {
             button.addEventListener('click', function() {
@@ -455,36 +480,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
         var selects = editContainer.getElementsByClassName('destinatario-select');
         Array.from(selects).forEach(function(select, idx) {
-            var customDiv = document.getElementById(`destinatario_custom_{{ o.numero }}_${idx + 1}_div`);
-            var customInput = document.getElementById(`destinatario_custom_{{ o.numero }}_${idx + 1}`);
-            var customLabel = document.querySelector(`label[for="destinatario_custom_{{ o.numero }}_${idx + 1}"]`);
-            select.addEventListener('change', function() {
-                if (this.value === 'Otro_Dentro') {
-                    customDiv.style.display = 'block';
-                    customInput.setAttribute('required', 'required');
-                    customLabel.textContent = 'Especifique otro destinatario (dentro)';
-                } else if (this.value === 'Otro_Fuera') {
-                    customDiv.style.display = 'block';
-                    customInput.setAttribute('required', 'required');
-                    customLabel.textContent = 'Especifique otro destinatario (fuera)';
-                } else {
-                    customDiv.style.display = 'none';
-                    customInput.removeAttribute('required');
-                    customInput.value = '';
-                    customLabel.textContent = 'Especifique otro destinatario';
-                }
-            });
+            attachSelectListener(select, idx + 1, 'edit_{{ o.numero }}');
         });
     })();
     {% endif %}
     {% endfor %}
 });
 
-document.styleSheets[0].insertRule(`
-    .highlight {
+document.styleSheets[0].insertRule(
+    `.highlight {
         background-color: #fff3cd;
         transition: background-color 2s;
-    }
-`, document.styleSheets[0].cssRules.length);
+    }`,
+    document.styleSheets[0].cssRules.length
+);
 </script>
 {% endblock %}

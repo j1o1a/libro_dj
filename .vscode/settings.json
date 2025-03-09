@@ -7,4 +7,6 @@
     "python.analysis.extraPaths": [
         "/Users/jam/Projects/env/lib/python3.13/site-packages"
     ]
+    "html.validate.scripts": false,
+    "css.validate": false
 }
