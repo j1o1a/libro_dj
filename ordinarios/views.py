@@ -500,18 +500,25 @@ def ordinarios_anular(request, pk):
         messages.error(request, 'No tienes permiso para anular este ordinario.')
         return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}")
     
-    ordinario.anulada = not ordinario.anulada
-    ordinario.save()
+    # Obtener todas las entradas con el mismo numero
+    grupo_ordinarios = Ordinario.objects.filter(numero=ordinario.numero)
     
-    accion = 'ANULADO' if ordinario.anulada else 'RESTAURADO'
+    # Determinar el nuevo estado de anulación (basado en la entrada actual)
+    nuevo_estado = not ordinario.anulada
+    
+    # Actualizar todas las entradas con el mismo numero
+    with transaction.atomic():
+        grupo_ordinarios.update(anulada=nuevo_estado)
+    
+    accion = 'ANULADO' if nuevo_estado else 'RESTAURADO'
     Auditoria.objects.create(
         usuario=request.user,
         tipo=accion,
         tabla='ordinarios',
-        registro_id=pk,
+        registro_id=ordinario.numero,
         detalles=f'Ordinario {ordinario.numero} {accion.lower()} por {request.user.username}'
     )
-    messages.success(request, f'Ordinario {ordinario.numero} {"anulado" if ordinario.anulada else "restaurado"} correctamente.')
+    messages.success(request, f'Ordinario {ordinario.numero} {"anulado" if nuevo_estado else "restaurado"} correctamente.')
     
     page = get_page_for_ordinario(ordinario, items_per_page, total_count, Ordinario.objects.all().order_by('-numero', '-creada'))
     return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}&page={page}#ordinario-{ordinario.pk}")

@@ -69,7 +69,7 @@
                 {% if o.iddoc %}
                     {{ o.iddoc|format_thousands }}
                 {% else %}
-                    Sin IDDOC
+                    S/N
                 {% endif %}
             </td>
             <td class="text-center {% if o.anulada %}text-decoration-line-through{% endif %}" {% if o.destinatario|length > 15 %}data-bs-toggle="tooltip" data-bs-title="{{ o.destinatario }}"{% endif %}>{{ o.destinatario|truncatechars:15|upper }}</td>
@@ -111,25 +111,53 @@
 {% if page_obj %}
 <nav aria-label="Page navigation">
     <ul class="pagination pagination-sm justify-content-center">
-        {% if page_obj.has_previous %}
-        <li class="page-item">
-            <a class="page-link" href="?items_per_page={{ items_per_page }}&page={{ page_obj.previous_page_number }}" aria-label="Previous">
+        <!-- Primera página -->
+        <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+            <a class="page-link" href="?items_per_page={{ items_per_page }}&page=1" aria-label="Primera">
+                <span aria-hidden="true">««</span>
+            </a>
+        </li>
+        <!-- Página anterior -->
+        <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+            <a class="page-link" href="{% if page_obj.has_previous %}?items_per_page={{ items_per_page }}&page={{ page_obj.previous_page_number }}{% else %}#{% endif %}" aria-label="Anterior">
                 <span aria-hidden="true">«</span>
             </a>
         </li>
+
+        {% with page_range=page_obj.paginator.page_range current=page_obj.number total_pages=page_obj.paginator.num_pages %}
+        {% comment %} Simplificar el paginador para evitar el uso de add {% endcomment %}
+        {% for num in page_range %}
+        {% if num == 1 or num == total_pages or num == current or num == current|add:-1 or num == current|add:1 or num == current|add:-2 or num == current|add:2 %}
+            <!-- Mostrar la primera página, la última, la actual y las dos anteriores/siguientes -->
+            <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+                <a class="page-link" href="?items_per_page={{ items_per_page }}&page={{ num }}">{{ num }}</a>
+            </li>
+        {% elif num == 2 and current > 4 %}
+            <!-- Mostrar ellipsis antes del rango si hay un salto -->
+            <li class="page-item disabled">
+                <span class="page-link">...</span>
+            </li>
+        {% elif num == total_pages|add:-1 and current < total_pages|add:-3 %}
+            <!-- Mostrar ellipsis después del rango si hay un salto -->
+            <li class="page-item disabled">
+                <span class="page-link">...</span>
+            </li>
         {% endif %}
-        {% for num in page_obj.paginator.page_range %}
-        <li class="page-item {% if page_obj.number == num %}active{% endif %}">
-            <a class="page-link" href="?items_per_page={{ items_per_page }}&page={{ num }}">{{ num }}</a>
-        </li>
         {% endfor %}
-        {% if page_obj.has_next %}
-        <li class="page-item">
-            <a class="page-link" href="?items_per_page={{ items_per_page }}&page={{ page_obj.next_page_number }}" aria-label="Next">
+        {% endwith %}
+
+        <!-- Página siguiente -->
+        <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+            <a class="page-link" href="{% if page_obj.has_next %}?items_per_page={{ items_per_page }}&page={{ page_obj.next_page_number }}{% else %}#{% endif %}" aria-label="Siguiente">
                 <span aria-hidden="true">»</span>
             </a>
         </li>
-        {% endif %}
+        <!-- Última página -->
+        <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+            <a class="page-link" href="?items_per_page={{ items_per_page }}&page={{ page_obj.paginator.num_pages }}" aria-label="Última">
+                <span aria-hidden="true">»»</span>
+            </a>
+        </li>
     </ul>
 </nav>
 {% endif %}

@@ -1,7 +1,6 @@
 - Que pasa si se coloca una fecha anterior.
 - Qué pasa con el cambio de año.
-- Modiifcar el bloqueo de libro para que nadie pueda agregar o editar. Usuario de staff pueden desbloquear el libro.
-- implementar la logica de entradas múltiples.
+- Modificar el bloqueo de libro para que nadie pueda agregar o editar. Usuario de staff pueden desbloquear el libro.
+- implementar la logica de entradas múltiples (HECHO).
 - Agregar columna REDOM.
 - Implementar el tema de los usuarios.
-- Reemplazar "Sin IDDOC" por "S/N".
