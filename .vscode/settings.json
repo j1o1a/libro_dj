@@ -1,0 +1,10 @@
+{
+    "python.pythonPath": "/Users/jam/Projects/env/bin/python3",
+    "python.defaultInterpreterPath": "/Users/jam/Projects/env/bin/python3",
+    "python.autoComplete.extraPaths": [
+        "/Users/jam/Projects/env/lib/python3.13/site-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/Users/jam/Projects/env/lib/python3.13/site-packages"
+    ]
+}

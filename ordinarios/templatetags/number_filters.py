@@ -15,3 +15,11 @@ def format_thousands(value):
         return "{:,}".format(num).replace(',', '.')
     except (ValueError, TypeError):
         return value  # Devolver el valor original si no se puede formatear
+
+@register.filter
+def lookup(value, key):
+    """
+    Permite acceder a un valor en un diccionario usando una clave.
+    Ejemplo: {{ grupos_datos|lookup:o.numero|lookup:'iddocs' }}
+    """
+    return value.get(key) if value else ''
