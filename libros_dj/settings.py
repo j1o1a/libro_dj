@@ -47,7 +47,7 @@ LOGGING = {
 }
 
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost','192.168.3.13','192.168.3.11']
 
 
 # Application definition

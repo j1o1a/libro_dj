@@ -11,8 +11,55 @@
     <link rel="stylesheet" href="{% static 'ico/bootstrap-icons.css' %}">
     <title>{% block title %}Título por defecto{% endblock %}</title>
 </head>
-<body>
+<body class="bg-light">
     <style>
+        .btn-primary {
+            background-color: #08ad1d;
+            border-color: #08ad1d;
+            color: #fff;
+        }
+        .btn-primary:hover,
+        .btn-primary:focus,
+        .btn-primary:active {
+            background-color: #067f16; /* Verde más oscuro para hover */
+            border-color: #067f16;
+            color: #fff;
+        }
+        .bg-primary {
+            background-color: #08ad1d !important;
+        }
+        .text-primary {
+            color: #08ad1d !important;
+        }
+        .text-primary:hover {
+            color: #067f16 !important; /* Hover para textos primary */
+        }
+        .nav-link {
+            color: #08ad1d; /* Pestañas */
+        }
+        .nav-link:hover,
+        .nav-link:focus {
+            color: #067f16; /* Hover para pestañas */
+        }
+        .page-link {
+            color: #08ad1d; /* Paginador no activo */
+        }
+        .page-link:hover,
+        .page-link:focus {
+            background-color: #e6f4e8; /* Fondo verde claro para hover */
+            color: #067f16; /* Texto más oscuro */
+            border-color: #08ad1d;
+        }
+        .page-link.active, .active > .page-link {
+            background-color: #08ad1d; /* Paginador activo */
+            border-color: #08ad1d;
+            color: #fff;
+        }
+        .page-link.active:hover, .active > .page-link:hover {
+            background-color: #067f16; /* Hover para paginador activo */
+            border-color: #067f16;
+            color: #fff;
+        }
         .rectangle {
             display: inline-block;
             width: 5px;
@@ -24,14 +71,12 @@
             text-align: justify;
         }
     </style>
-    <!-- Navbar (Fondo negro) -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container-fluid">
-            <!-- Logo -->
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top shadow-sm">
+        <div class="container-fluid px-4">
             <a class="navbar-brand" href="{% url 'ordinarios_lista' %}">
                 <img src="{% static 'img/logo_blanco.svg' %}" alt="Logo La Florida" height="40">
             </a>
-            <!-- Usuario Loggeado -->
             <div class="d-flex align-items-center text-white">
                 <i class="bi bi-person-circle fs-4 me-2"></i>
                 <span class="me-3">{{ user.username }}</span>
@@ -42,34 +87,35 @@
             </div>
         </div>
     </nav>
-    <div class="container mt-3">
-        <div class="card shadow">
-            <div class="card-body">
-    <!-- Pestañas de Navegación -->
-    <ul class="nav nav-tabs mt-3">
-        <li class="nav-item">
-            <a class="nav-link {% if active_tab == 'ordinarios' %}active{% endif %}" href="{% url 'ordinarios_lista' %}">Ordinarios</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link {% if active_tab == 'memorandos' %}active{% endif %}" href="{% url 'memorandos_lista' %}">Memorandos</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link {% if active_tab == 'busqueda' %}active{% endif %}" href="#">Búsqueda</a>
-        </li>
-        {% if user.is_staff %}
-        <li class="nav-item">
-            <a class="nav-link {% if active_tab == 'ajustes' %}active{% endif %}" href="{% url 'ajustes' %}">Ajustes</a>
-        </li>
-        {% endif %}
-    </ul>
 
-                {% block content %}{% endblock %}
-            </div>
-            <div class="card-footer text-muted">
-                <span class="rectangle"></span>
-                DIRECCIÓN JURÍDICA
-            </div>
-        </div>
+    <!-- Pestañas y Contenido -->
+    <div class="mx-4 mt-4">
+        <ul class="nav nav-tabs border-0">
+            <li class="nav-item">
+                <a class="nav-link {% if active_tab == 'ordinarios' %}active bg-white{% else %}bg-light{% endif %} border-0 rounded-top px-3 py-2 {% if active_tab == 'ordinarios' %}fw-medium{% endif %}" href="{% url 'ordinarios_lista' %}">Ordinarios</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if active_tab == 'memorandos' %}active bg-white{% else %}bg-light{% endif %} border-0 rounded-top px-3 py-2 {% if active_tab == 'memorandos' %}fw-medium{% endif %}" href="{% url 'memorandos_lista' %}">Memorandos</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if active_tab == 'busqueda' %}active bg-white{% else %}bg-light{% endif %} border-0 rounded-top px-3 py-2 {% if active_tab == 'busqueda' %}fw-medium{% endif %}" href="#">Búsqueda</a>
+            </li>
+            {% if user.is_staff %}
+            <li class="nav-item">
+                <a class="nav-link {% if active_tab == 'ajustes' %}active bg-white{% else %}bg-light{% endif %} border-0 rounded-top px-3 py-2 {% if active_tab == 'ajustes' %}fw-medium{% endif %}" href="{% url 'ajustes' %}">Ajustes</a>
+            </li>
+            {% endif %}
+        </ul>
+    </div>
+
+    <!-- Contenido -->
+    <div class="bg-white shadow mx-4 mb-4 p-4 border-0 rounded-bottom">
+        {% block content %}{% endblock %}
+    </div>
+    <!-- Footer -->
+    <div class="text-start mb-4 mx-4">
+        <span class="rectangle"></span>
+        DIRECCIÓN JURÍDICA
     </div>
 </body>
 </html>

@@ -1,0 +1,5 @@
+Bootstrap Icons CSS (bootstrap-icons.css)
+Versión: 1.11.3 (última al 25/01/2024).
+URL: https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css
+Descarga y guarda en: static/ico/bootstrap-icons.css.
+
