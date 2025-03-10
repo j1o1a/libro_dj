@@ -11,62 +11,76 @@ from auditoria.models import Auditoria
 from django.core.cache import cache
 import logging
 
-# Configurar logging
 logger = logging.getLogger(__name__)
 
-# Función auxiliar optimizada para calcular la página de un ordinario
+# Días y meses en español para formatear la fecha
+DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+
 def get_page_for_ordinario(ordinario, items_per_page, total_count, ordinarios_list):
     items_per_page_int = int(items_per_page) if items_per_page != 'all' else total_count
-    
-    # Calcular count_before usando ordinarios_list para evitar consultas adicionales
     count_before = 0
     for o in ordinarios_list:
         if o.numero > ordinario.numero or (o.numero == ordinario.numero and o.pk > ordinario.pk):
             count_before += 1
-    
     page = (count_before // items_per_page_int) + 1 if count_before > 0 else 1
     return page
 
+def format_fecha(fecha):
+    """Formatea una fecha como 'Día de la semana día de mes del año'."""
+    dia_semana = DIAS_SEMANA[fecha.weekday()]
+    dia = fecha.day
+    mes = MESES[fecha.month - 1]
+    año = fecha.year
+    return f"{dia_semana} {dia} de {mes} del {año}"
+
 @login_required
 def ordinarios_lista(request):
+    logger.info(f"Usuario {request.user.username} accedió a la lista de ordinarios")
     items_per_page = request.GET.get('items_per_page', '10')
     page = request.GET.get('page', '1')
+    year = request.GET.get('year', datetime.now().year)
     
-    # Determinar el número de registros por página y obtener el conteo total
-    total_count = Ordinario.objects.count()  # Hacer el conteo una sola vez
+    try:
+        year = int(year)
+    except ValueError:
+        logger.warning(f"Usuario {request.user.username} ingresó un año inválido: {year}, usando año actual")
+        year = datetime.now().year
+    
+    total_count = Ordinario.objects.filter(fecha__year=year).count()
     if items_per_page == 'all':
         items_per_page_int = total_count
     else:
         try:
             items_per_page_int = int(items_per_page)
         except (ValueError, TypeError):
+            logger.warning(f"Usuario {request.user.username} ingresó items_per_page inválido: {items_per_page}, usando 10")
             items_per_page_int = 10
             items_per_page = '10'
     
-    # Paginación inicial para determinar el rango de registros a cargar
-    all_ordinarios = Ordinario.objects.only('pk', 'numero', 'iddoc', 'destinatario', 'materia', 'fecha', 'creada', 'autor', 'anulada', 'redom').order_by('-numero', '-creada')
+    all_ordinarios = Ordinario.objects.filter(fecha__year=year).only(
+        'pk', 'numero', 'iddoc', 'destinatario', 'materia', 'fecha', 'creada', 'autor', 'anulada', 'redom'
+    ).order_by('-numero', '-creada')
     paginator = Paginator(all_ordinarios, items_per_page_int)
     
     try:
         paginated_ordinarios = paginator.page(page)
     except PageNotAnInteger:
+        logger.debug(f"Usuario {request.user.username} solicitó página no numérica: {page}, redirigiendo a página 1")
         paginated_ordinarios = paginator.page(1)
     except EmptyPage:
+        logger.debug(f"Usuario {request.user.username} solicitó página vacía: {page}, redirigiendo a última página")
         paginated_ordinarios = paginator.page(paginator.num_pages)
     
     page_obj = paginated_ordinarios
-    
-    # Determinar los números (numero) presentes en la página actual
     visible_numbers = list(set(o.numero for o in paginated_ordinarios))
     
-    # Cargar todos los registros correspondientes a los números visibles
     ordinarios_list = list(
-        Ordinario.objects.only('pk', 'numero', 'iddoc', 'destinatario', 'materia', 'fecha', 'creada', 'autor', 'anulada', 'redom')
-        .filter(numero__in=visible_numbers)
-        .order_by('-numero', '-creada')
+        Ordinario.objects.filter(fecha__year=year, numero__in=visible_numbers).only(
+            'pk', 'numero', 'iddoc', 'destinatario', 'materia', 'fecha', 'creada', 'autor', 'anulada', 'redom'
+        ).order_by('-numero', '-creada')
     )
     
-    # Construir grupos_datos y calcular atributos para los números visibles
     grupos_datos = {}
     latest_entries = {}
     first_entries = {}
@@ -92,13 +106,13 @@ def ordinarios_lista(request):
                     'destinatarios': ", ".join(unique_destinatarios),
                     'materia': items_for_numero[0].materia,
                     'fecha': items_for_numero[0].fecha.strftime('%Y-%m-%d') if items_for_numero[0].fecha else '',
+                    'fecha_texto': format_fecha(items_for_numero[0].fecha) if items_for_numero[0].fecha else '',
                 }
             current_numero = o.numero
             items_for_numero = [o]
         else:
             items_for_numero.append(o)
     
-    # Procesar el último grupo
     if current_numero is not None and items_for_numero:
         latest_entry = max(items_for_numero, key=lambda x: (x.creada or datetime.min, x.pk))
         first_entry = items_for_numero[0]
@@ -114,16 +128,15 @@ def ordinarios_lista(request):
             'destinatarios': ", ".join(unique_destinatarios),
             'materia': items_for_numero[0].materia,
             'fecha': items_for_numero[0].fecha.strftime('%Y-%m-%d') if items_for_numero[0].fecha else '',
+            'fecha_texto': format_fecha(items_for_numero[0].fecha) if items_for_numero[0].fecha else '',
         }
     
-    # Asignar atributos a los objetos visibles
     for o in paginated_ordinarios:
         o.es_mas_reciente = (o.pk == latest_entries.get(o.numero))
         o.es_multiple = es_multiple_dict.get(o.numero, False)
         o.is_first_in_group = (o.pk == first_entries.get(o.numero))
         o.is_last_in_group = (o.pk == last_entries.get(o.numero))
     
-    # Preprocesar datos para modales de edición con destinatarios únicos
     edit_data = {}
     for numero in visible_numbers:
         entries = [o for o in ordinarios_list if o.numero == numero]
@@ -131,27 +144,37 @@ def ordinarios_lista(request):
         edit_data[numero] = unique_destinatarios
         logger.debug(f"Destinatarios para ordinario {numero}: {[d['destinatario'] for d in unique_destinatarios]}")
     
-    # Usar caché para destinatarios_dentro y destinatarios_fuera
     cache_key = 'destinatarios_ordinarios'
     destinatarios_cached = cache.get(cache_key)
     if destinatarios_cached is None:
         destinatarios_dentro = list(Destinatario.objects.filter(es_municipio=True).order_by('orden'))
         destinatarios_fuera = list(Destinatario.objects.filter(es_municipio=False).order_by('orden'))
         cache.set(cache_key, {'dentro': destinatarios_dentro, 'fuera': destinatarios_fuera}, timeout=3600)
+        logger.info(f"Usuario {request.user.username} generó caché de destinatarios")
     else:
         destinatarios_dentro = destinatarios_cached['dentro']
         destinatarios_fuera = destinatarios_cached['fuera']
+        logger.debug(f"Usuario {request.user.username} usó caché de destinatarios")
     
-    # Consultar config con select_related para bloqueado_por
     config, created = LibroConfig.objects.select_related('bloqueado_por').get_or_create(id=1)
+    fecha_actual = datetime.now().date()
+    fecha_actual_texto = format_fecha(fecha_actual)
     
-    fecha_actual = datetime.now().strftime('%Y-%m-%d')
+    years_db = sorted(set(Ordinario.objects.values_list('fecha__year', flat=True)), reverse=True)
+    current_year = datetime.now().year
+    years = years_db
+    if datetime.now().month == 12 and datetime.now().day == 31:
+        if current_year + 1 not in years:
+            years.insert(0, current_year + 1)
+            logger.info(f"Usuario {request.user.username} vio el año siguiente {current_year + 1} en el selector")
     
+    logger.info(f"Usuario {request.user.username} cargó lista de ordinarios para año {year} con {total_count} registros")
     return render(request, 'ordinarios/lista.html', {
         'ordinarios': paginated_ordinarios,
         'page_obj': page_obj,
         'items_per_page': str(items_per_page),
-        'fecha_actual': fecha_actual,
+        'fecha_actual': fecha_actual.strftime('%Y-%m-%d'),
+        'fecha_actual_texto': fecha_actual_texto,
         'destinatarios_dentro': destinatarios_dentro,
         'destinatarios_fuera': destinatarios_fuera,
         'config': config,
@@ -159,25 +182,32 @@ def ordinarios_lista(request):
         'grupos_datos': grupos_datos,
         'edit_data': edit_data,
         'total_count': total_count,
+        'years': years,
+        'selected_year': year,
     })
 
 @login_required
 def ordinarios_bloquear(request):
+    logger.info(f"Usuario {request.user.username} intentó acceder a bloquear/desbloquear el libro")
     config = LibroConfig.objects.select_related('bloqueado_por').get(id=1)
     items_per_page = request.GET.get('items_per_page', '10')
-    total_count = Ordinario.objects.count()
+    year = request.GET.get('year', datetime.now().year)
     
     if config.bloqueado and config.bloqueado_por != request.user and not request.user.is_staff:
+        logger.warning(f"Usuario {request.user.username} intentó acceder a libro bloqueado por {config.bloqueado_por.username}")
         return render(request, 'ordinarios/lista.html', {
-            'ordinarios': Ordinario.objects.only('pk', 'numero'),
+            'ordinarios': Ordinario.objects.filter(fecha__year=year).only('pk', 'numero'),
             'items_per_page': items_per_page,
             'fecha_actual': datetime.now().strftime('%Y-%m-%d'),
+            'fecha_actual_texto': format_fecha(datetime.now().date()),
             'destinatarios_dentro': cache.get_or_set('destinatarios_ordinarios_dentro', list(Destinatario.objects.filter(es_municipio=True).order_by('orden')), timeout=3600),
             'destinatarios_fuera': cache.get_or_set('destinatarios_ordinarios_fuera', list(Destinatario.objects.filter(es_municipio=False).order_by('orden')), timeout=3600),
             'config': config,
             'active_tab': 'ordinarios',
             'show_blocked_modal': True,
-            'total_count': total_count,
+            'total_count': Ordinario.objects.filter(fecha__year=year).count(),
+            'years': sorted(set(Ordinario.objects.values_list('fecha__year', flat=True)), reverse=True),
+            'selected_year': int(year),
         })
     
     if request.method == 'POST':
@@ -194,27 +224,31 @@ def ordinarios_bloquear(request):
             detalles=f'Libro de ordinarios {accion.lower()} por {request.user.username}'
         )
         messages.success(request, f'Libro de ordinarios {"bloqueado" if config.bloqueado else "desbloqueado"} correctamente.')
+        logger.info(f"Usuario {request.user.username} {accion.lower()} el libro de ordinarios")
     
-    return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}")
+    return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}&year={year}")
 
 @login_required
 def ordinarios_agregar(request):
+    logger.info(f"Usuario {request.user.username} accedió a agregar un ordinario")
     config = LibroConfig.objects.select_related('bloqueado_por').get(id=1)
     items_per_page = request.GET.get('items_per_page', '10')
     total_count = Ordinario.objects.count()
     ordinarios_list = list(Ordinario.objects.only('pk', 'numero', 'creada').order_by('-numero', '-creada'))
     
     if config.bloqueado and config.bloqueado_por != request.user and not request.user.is_staff:
+        logger.warning(f"Usuario {request.user.username} intentó agregar ordinario con libro bloqueado por {config.bloqueado_por.username}")
         messages.error(request, 'El libro está bloqueado. No se pueden agregar registros.')
         return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}")
     
     if request.method == 'POST':
         data = request.POST
-        fecha = data.get('fecha') or datetime.now().date()
         materia = data.get('materia', '').strip()
         iddoc_input = data.get('iddoc', '').strip()
+        logger.info(f"Usuario {request.user.username} envió datos para agregar ordinario: iddoc={iddoc_input}, materia={materia}")
         
-        # Procesar múltiples destinatarios
+        fecha = datetime.now().date()
+        
         destinatarios = []
         i = 1
         while True:
@@ -222,16 +256,18 @@ def ordinarios_agregar(request):
             custom_key = f'destinatario_custom_{i}'
             if select_key not in data:
                 break
-            select_values = data.getlist(f'destinatario_select_{i}')  # Obtener todos los valores para la clave
+            select_values = data.getlist(f'destinatario_select_{i}')
             custom_value = data.get(custom_key, '').strip()
             for select_value in select_values:
                 select_value = select_value.strip()
                 if select_value in ['Otro_Dentro', 'Otro_Fuera']:
                     if not custom_value:
+                        logger.warning(f"Usuario {request.user.username} no especificó destinatario personalizado en campo #{i}")
                         messages.error(request, f'Por favor, especifique un destinatario personalizado para el campo #{i}.')
                         return render(request, 'ordinarios/lista.html', {
                             'ordinarios': Ordinario.objects.only('pk', 'numero', 'iddoc', 'destinatario', 'materia', 'fecha', 'creada', 'autor', 'anulada', 'redom'),
                             'fecha_actual': datetime.now().strftime('%Y-%m-%d'),
+                            'fecha_actual_texto': format_fecha(datetime.now().date()),
                             'destinatarios_dentro': cache.get_or_set('destinatarios_ordinarios_dentro', list(Destinatario.objects.filter(es_municipio=True).order_by('orden')), timeout=3600),
                             'destinatarios_fuera': cache.get_or_set('destinatarios_ordinarios_fuera', list(Destinatario.objects.filter(es_municipio=False).order_by('orden')), timeout=3600),
                             'config': config,
@@ -246,14 +282,12 @@ def ordinarios_agregar(request):
                     destinatarios.append(select_value)
             i += 1
         
-        # Eliminar duplicados en destinatarios
         destinatarios = list(dict.fromkeys(destinatarios))
-        
         iddoc_list = [idd.strip() for idd in iddoc_input.split(',') if idd.strip()] or [None]
         
         try:
             with transaction.atomic():
-                ultimo = Ordinario.objects.select_for_update().order_by('-numero').first()
+                ultimo = Ordinario.objects.filter(fecha__year=fecha.year).select_for_update().order_by('-numero').first()
                 numero = (ultimo.numero + 1) if ultimo else 1
                 
                 registros = []
@@ -275,43 +309,49 @@ def ordinarios_agregar(request):
                 Ordinario.objects.bulk_create(registros)
                 
                 Auditoria.objects.create(
-                    usuario=request.user, tipo='CREAR', tabla='ordinarios',
-                    registro_id=numero, detalles=f'Creado ordinario {numero} con {len(registros)} entradas (IDDOC x Destinatarios)'
+                    usuario=request.user,
+                    tipo='CREAR',
+                    tabla='ordinarios',
+                    registro_id=numero,
+                    detalles=f'Creado ordinario {numero} con {len(registros)} entradas (IDDOC x Destinatarios)'
                 )
                 messages.success(request, f'Ordinario {numero} agregado con {len(registros)} entradas.')
+                logger.info(f"Usuario {request.user.username} agregó ordinario {numero} con {len(registros)} entradas")
         
         except ValueError as e:
+            logger.error(f"Usuario {request.user.username} falló al agregar ordinario: Error en iddoc={iddoc_input}, {str(e)}")
             messages.error(request, f'Error en los datos: {str(e)}. Asegúrate de que "iddoc" sean números válidos separados por comas.')
         
-        return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}")
+        return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}&year={fecha.year}")
     
     return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}")
 
 @login_required
 def ordinarios_editar(request, pk):
+    logger.info(f"Usuario {request.user.username} intentó editar ordinario con pk={pk}")
     ordinario = get_object_or_404(Ordinario, pk=pk)
     items_per_page = request.GET.get('items_per_page', '10')
     page = request.GET.get('page', '1')
+    year = request.GET.get('year', datetime.now().year)
     grupo_ordinarios = Ordinario.objects.filter(numero=ordinario.numero).order_by('-creada')
     
     if request.method == 'POST':
         data = request.POST
         logger.debug(f"Datos recibidos del formulario: {data}")
         
-        fecha = data.get('fecha')
+        fecha = ordinario.fecha  # Mantener la fecha original
         iddoc_input = data.get('iddoc', '').strip()
         materia = data.get('materia', '').strip()
+        logger.info(f"Usuario {request.user.username} editando ordinario {ordinario.numero}: iddoc={iddoc_input}, materia={materia}")
         
-        # Procesar iddoc
         iddoc_list = [idd.strip() for idd in iddoc_input.split(',') if idd.strip()] or [None]
-        iddoc_list = list(dict.fromkeys([int(idd.replace('.', '')) if idd else None for idd in iddoc_list]))  # Convertir a int o None y eliminar duplicados
+        iddoc_list = list(dict.fromkeys([int(idd.replace('.', '')) if idd else None for idd in iddoc_list]))
         
-        # Procesar destinatarios
         destinatarios = []
         for key in data.keys():
             if key.startswith('destinatario_select_'):
                 index = int(key.split('_')[-1])
-                select_values = data.getlist(key)  # Obtener todos los valores para la clave
+                select_values = data.getlist(key)
                 custom_value = data.get(f'destinatario_custom_{index}', '').strip()
                 logger.debug(f"Procesando {key}: select_values={select_values}, custom_value={custom_value}")
                 for select_value in select_values:
@@ -323,23 +363,21 @@ def ordinarios_editar(request, pk):
         
         logger.debug(f"Destinatarios procesados antes de validación: {destinatarios}")
         
-        # Calcular total_count dentro del bloque POST
-        total_count = Ordinario.objects.count()
+        total_count = Ordinario.objects.filter(fecha__year=year).count()
         ordinarios_list = list(
-            Ordinario.objects.only('pk', 'numero', 'iddoc', 'destinatario', 'materia', 'fecha', 'creada', 'autor', 'anulada', 'redom')
+            Ordinario.objects.filter(fecha__year=year).only('pk', 'numero', 'iddoc', 'destinatario', 'materia', 'fecha', 'creada', 'autor', 'anulada', 'redom')
             .order_by('-numero', '-creada')
         )
         
-        # Validar que haya al menos un destinatario
         if not destinatarios:
+            logger.warning(f"Usuario {request.user.username} intentó editar ordinario {ordinario.numero} sin destinatarios")
             messages.error(request, 'Debe especificar al menos un destinatario.')
             form_data = {
-                'fecha': fecha,
+                'fecha': fecha.strftime('%Y-%m-%d'),
                 'iddoc': ", ".join(str(idd) for idd in iddoc_list if idd is not None),
                 'materia': materia,
                 'destinatarios': [{'select_value': d, 'custom_value': ''} for d in set(destinatarios) if d] if destinatarios else [],
             }
-            # Renderizar lista.html con el modal abierto y datos preservados
             paginator = Paginator(ordinarios_list, int(items_per_page) if items_per_page != 'all' else total_count)
             try:
                 paginated_ordinarios = paginator.page(page)
@@ -348,8 +386,7 @@ def ordinarios_editar(request, pk):
             except EmptyPage:
                 paginated_ordinarios = paginator.page(paginator.num_pages)
             
-            page_obj = paginated_ordinarios  # Definir page_obj aquí
-            
+            page_obj = paginated_ordinarios
             visible_numbers = list(set(o.numero for o in paginated_ordinarios))
             ordinarios_list_filtered = [o for o in ordinarios_list if o.numero in visible_numbers]
             grupos_datos = {}
@@ -377,6 +414,7 @@ def ordinarios_editar(request, pk):
                             'destinatarios': ", ".join(unique_destinatarios),
                             'materia': items_for_numero[0].materia,
                             'fecha': items_for_numero[0].fecha.strftime('%Y-%m-%d') if items_for_numero[0].fecha else '',
+                            'fecha_texto': format_fecha(items_for_numero[0].fecha) if items_for_numero[0].fecha else '',
                         }
                     current_numero = o.numero
                     items_for_numero = [o]
@@ -398,6 +436,7 @@ def ordinarios_editar(request, pk):
                     'destinatarios': ", ".join(unique_destinatarios),
                     'materia': items_for_numero[0].materia,
                     'fecha': items_for_numero[0].fecha.strftime('%Y-%m-%d') if items_for_numero[0].fecha else '',
+                    'fecha_texto': format_fecha(items_for_numero[0].fecha) if items_for_numero[0].fecha else '',
                 }
             
             for o in paginated_ordinarios:
@@ -424,12 +463,14 @@ def ordinarios_editar(request, pk):
             
             config, created = LibroConfig.objects.select_related('bloqueado_por').get_or_create(id=1)
             fecha_actual = datetime.now().strftime('%Y-%m-%d')
+            fecha_actual_texto = format_fecha(datetime.now().date())
             
             return render(request, 'ordinarios/lista.html', {
                 'ordinarios': paginated_ordinarios,
                 'page_obj': page_obj,
                 'items_per_page': items_per_page,
                 'fecha_actual': fecha_actual,
+                'fecha_actual_texto': fecha_actual_texto,
                 'destinatarios_dentro': destinatarios_dentro,
                 'destinatarios_fuera': destinatarios_fuera,
                 'config': config,
@@ -439,12 +480,12 @@ def ordinarios_editar(request, pk):
                 'total_count': total_count,
                 'form_data': form_data,
                 'show_edit_modal': ordinario.numero,
+                'years': sorted(set(Ordinario.objects.values_list('fecha__year', flat=True)), reverse=True),
+                'selected_year': int(year),
             })
         
-        # Eliminar duplicados en destinatarios
-        destinatarios = list(dict.fromkeys(destinatarios))  # Convierte a lista con elementos únicos
+        destinatarios = list(dict.fromkeys(destinatarios))
         
-        # Crear combinaciones únicas de iddoc y destinatarios
         registros = []
         seen_combinations = set()
         for iddoc in iddoc_list:
@@ -464,14 +505,14 @@ def ordinarios_editar(request, pk):
                     registros.append(ordinario_new)
         
         with transaction.atomic():
-            grupo_ordinarios.delete()  # Eliminar todas las entradas existentes
+            grupo_ordinarios.delete()
             Ordinario.objects.bulk_create(registros)
         
         messages.success(request, f'Ordinario {ordinario.numero} editado correctamente.')
+        logger.info(f"Usuario {request.user.username} editó ordinario {ordinario.numero} con {len(registros)} entradas")
         page = get_page_for_ordinario(ordinario, items_per_page, total_count, ordinarios_list)
-        return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}&page={page}#ordinario-{ordinario.pk}")
+        return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}&page={page}&year={year}#ordinario-{ordinario.pk}")
     
-    # Inicializar con iddocs y destinatarios únicos
     unique_iddocs = sorted(set(o.iddoc for o in grupo_ordinarios if o.iddoc))
     iddocs = ", ".join(str(iddoc) for iddoc in unique_iddocs)
     unique_destinatarios = set(o.destinatario for o in grupo_ordinarios)
@@ -483,30 +524,32 @@ def ordinarios_editar(request, pk):
         'materia': ordinario.materia,
         'fecha': ordinario.fecha,
         'items_per_page': items_per_page,
+        'years': sorted(set(Ordinario.objects.values_list('fecha__year', flat=True)), reverse=True),
+        'selected_year': int(year),
     })
 
 @login_required
 def ordinarios_anular(request, pk):
+    logger.info(f"Usuario {request.user.username} intentó anular ordinario con pk={pk}")
     ordinario = get_object_or_404(Ordinario, pk=pk)
     items_per_page = request.GET.get('items_per_page', '10')
+    year = request.GET.get('year', datetime.now().year)
     config = LibroConfig.objects.select_related('bloqueado_por').get(id=1)
-    total_count = Ordinario.objects.count()
+    total_count = Ordinario.objects.filter(fecha__year=year).count()
     
     if config.bloqueado and config.bloqueado_por != request.user and not request.user.is_staff:
+        logger.warning(f"Usuario {request.user.username} intentó anular ordinario {ordinario.numero} con libro bloqueado por {config.bloqueado_por.username}")
         messages.error(request, 'El libro está bloqueado. No se pueden anular ni restaurar registros.')
-        return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}")
+        return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}&year={year}")
     
     if ordinario.autor != request.user.username[:10] and not request.user.is_staff:
+        logger.warning(f"Usuario {request.user.username} intentó anular ordinario {ordinario.numero} sin permiso")
         messages.error(request, 'No tienes permiso para anular este ordinario.')
-        return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}")
+        return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}&year={year}")
     
-    # Obtener todas las entradas con el mismo numero
     grupo_ordinarios = Ordinario.objects.filter(numero=ordinario.numero)
-    
-    # Determinar el nuevo estado de anulación (basado en la entrada actual)
     nuevo_estado = not ordinario.anulada
     
-    # Actualizar todas las entradas con el mismo numero
     with transaction.atomic():
         grupo_ordinarios.update(anulada=nuevo_estado)
     
@@ -519,27 +562,31 @@ def ordinarios_anular(request, pk):
         detalles=f'Ordinario {ordinario.numero} {accion.lower()} por {request.user.username}'
     )
     messages.success(request, f'Ordinario {ordinario.numero} {"anulado" if nuevo_estado else "restaurado"} correctamente.')
+    logger.info(f"Usuario {request.user.username} {accion.lower()} ordinario {ordinario.numero}")
     
-    page = get_page_for_ordinario(ordinario, items_per_page, total_count, Ordinario.objects.all().order_by('-numero', '-creada'))
-    return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}&page={page}#ordinario-{ordinario.pk}")
+    page = get_page_for_ordinario(ordinario, items_per_page, total_count, Ordinario.objects.filter(fecha__year=year).order_by('-numero', '-creada'))
+    return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}&page={page}&year={year}#ordinario-{ordinario.pk}")
 
 @login_required
 def ordinarios_eliminar(request, pk):
+    logger.info(f"Usuario {request.user.username} intentó eliminar ordinario con pk={pk}")
     ordinario = get_object_or_404(Ordinario, pk=pk)
     items_per_page = request.GET.get('items_per_page', '10')
+    year = request.GET.get('year', datetime.now().year)
     config = LibroConfig.objects.select_related('bloqueado_por').get(id=1)
     
     if config.bloqueado and config.bloqueado_por != request.user and not request.user.is_staff:
+        logger.warning(f"Usuario {request.user.username} intentó eliminar ordinario {ordinario.numero} con libro bloqueado por {config.bloqueado_por.username}")
         messages.error(request, 'El libro está bloqueado. No se pueden eliminar registros.')
-        return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}")
+        return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}&year={year}")
     
     if ordinario.autor != request.user.username[:10]:
+        logger.warning(f"Usuario {request.user.username} intentó eliminar ordinario {ordinario.numero} sin permiso")
         messages.error(request, 'No tienes permiso para eliminar este ordinario.')
-        return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}")
+        return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}&year={year}")
     
     if request.method == 'POST':
         with transaction.atomic():
-            # Eliminar todas las entradas con el mismo número
             Ordinario.objects.filter(numero=ordinario.numero).delete()
             Auditoria.objects.create(
                 usuario=request.user,
@@ -549,6 +596,7 @@ def ordinarios_eliminar(request, pk):
                 detalles=f'Eliminado ordinario {ordinario.numero}'
             )
         messages.success(request, f'Ordinario {ordinario.numero} eliminado correctamente.')
-        return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}")
+        logger.info(f"Usuario {request.user.username} eliminó ordinario {ordinario.numero}")
+        return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}&year={year}")
     
-    return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}")
+    return redirect(f"{reverse('ordinarios_lista')}?items_per_page={items_per_page}&year={year}")

@@ -1,10 +1,12 @@
 {% extends 'core/base.html' %}
 {% load static number_filters %}
 
-{% block title %}Libro de Ordinarios{% endblock %}
+{% block title %}Libro de Ordinarios - {{ selected_year }}{% endblock %}
 
 {% block content %}
-<h1 class="mt-3 mb-3">Libro de Ordinarios</h1>
+<div class="bg-light p-3 border-bottom">
+    <h4 class="mb-0">Libro de ordinarios - {{ selected_year }}</h4>
+</div>
 
 {% if messages %}
 {% for message in messages %}
@@ -15,20 +17,28 @@
 {% endfor %}
 {% endif %}
 
-<div class="d-flex justify-content-between mb-2">
-    <div>
-        <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#agregarModal" {% if config.bloqueado and config.bloqueado_por != user and not user.is_staff %}disabled{% endif %}>Agregar nuevo ordinario</button>
+<div class="d-flex justify-content-between mb-2 mt-3 align-items-center">
+    <div class="d-flex align-items-center">
+        <label for="yearFilter" class="me-2">Año:</label>
+        <select id="yearFilter" name="year" class="form-select form-select-sm" style="width: auto;" 
+                onchange="window.location.href='?year=' + this.value + '&items_per_page={{ items_per_page|default:'10' }}&page=1'" 
+                data-bs-toggle="tooltip" data-bs-title="Filtra los ordinarios por año">
+            {% for year in years %}
+            <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>{{ year }}</option>
+            {% endfor %}
+        </select>
+        <button type="button" class="btn btn-sm btn-primary ms-3" data-bs-toggle="modal" data-bs-target="#agregarModal" {% if config.bloqueado and config.bloqueado_por != user and not user.is_staff %}disabled{% endif %}>Agregar nuevo ordinario</button>
         {% if config.bloqueado and config.bloqueado_por != user and not user.is_staff %}
-        <a href="{% url 'ordinarios_bloquear' %}" class="btn btn-sm btn-danger animate-pulse">Libro bloqueado</a>
+        <a href="{% url 'ordinarios_bloquear' %}" class="btn btn-sm btn-danger animate-pulse ms-2">Libro bloqueado</a>
         {% else %}
-        <a href="#" class="btn btn-sm {% if config.bloqueado %}btn-danger animate-pulse{% else %}btn-danger{% endif %}" data-bs-toggle="modal" data-bs-target="#bloquearModal">
+        <a href="#" class="btn btn-sm {% if config.bloqueado %}btn-danger animate-pulse{% else %}btn-danger{% endif %} ms-2" data-bs-toggle="modal" data-bs-target="#bloquearModal">
             {% if config.bloqueado %}Desbloquear{% else %}Bloquear{% endif %} Libro
         </a>
         {% endif %}
     </div>
     <div class="d-flex align-items-center">
         <label for="items_per_page" class="me-2 small">Ítems por página:</label>
-        <select name="items_per_page" id="items_per_page" class="form-select form-select-sm" style="width: auto;" onchange="window.location.href='?items_per_page=' + this.value + '{% if page_obj %}&page={{ page_obj.number }}{% endif %}'">
+        <select name="items_per_page" id="items_per_page" class="form-select form-select-sm" style="width: auto;" onchange="window.location.href='?year={{ selected_year }}&items_per_page=' + this.value + '&page=1'">
             <option value="10" {% if items_per_page == '10' %}selected{% endif %}>10</option>
             <option value="20" {% if items_per_page == '20' %}selected{% endif %}>20</option>
             <option value="50" {% if items_per_page == '50' %}selected{% endif %}>50</option>
@@ -53,7 +63,6 @@
     <tbody>
         {% for o in ordinarios %}
         <tr class="text-center {% if o.es_multiple %}multiple-entry numero-{{ o.numero }}{% if o.is_first_in_group %} first-in-group{% endif %}{% if o.is_last_in_group %} last-in-group{% endif %}{% endif %}" id="ordinario-{{ o.pk }}">
-            <!-- Debug: es_multiple={{ o.es_multiple }}, is_first_in_group={{ o.is_first_in_group }}, is_last_in_group={{ o.is_last_in_group }} -->
             {% if o.es_mas_reciente %}
             <td class="fw-bold {% if o.anulada %}text-decoration-line-through{% endif %}">
                 {{ o.numero }}
@@ -80,12 +89,18 @@
                 {% if o.autor == user.username|slice:":10" or user.is_staff %}
                 {% if config.bloqueado and config.bloqueado_por != user and not user.is_staff %}
                 <span class="action-link text-muted" data-bs-toggle="tooltip" data-bs-title="Editar entrada (bloqueada)"><i class="bi bi-pencil"></i></span>
-                <span class="action-link text-muted" data-bs-toggle="tooltip" data-bs-title="Anular entrada (bloqueada)"><i class="bi bi-slash-circle"></i></span>
+                <span class="action-link text-muted" data-bs-toggle="tooltip" data-bs-title="{% if o.anulada %}Restaurar entrada (bloqueada){% else %}Anular entrada (bloqueada){% endif %}">
+                    <i class="bi {% if o.anulada %}bi-arrow-counterclockwise{% else %}bi-slash-circle{% endif %}"></i>
+                </span>
                 {% else %}
                 <span class="action-link" data-bs-toggle="tooltip" data-bs-title="Editar entrada">
                     <a href="#" class="text-decoration-none text-primary" data-bs-toggle="modal" data-bs-target="#editarModal{{ o.numero }}"><i class="bi bi-pencil"></i></a>
                 </span>
-                <a href="{% url 'ordinarios_anular' o.pk %}?items_per_page={{ items_per_page }}" class="action-link text-decoration-none text-danger" data-bs-toggle="tooltip" data-bs-title="Anular entrada"><i class="bi bi-slash-circle"></i></a>
+                <span class="action-link" data-bs-toggle="tooltip" data-bs-title="{% if o.anulada %}Restaurar entrada{% else %}Anular entrada{% endif %}">
+                    <a href="{% url 'ordinarios_anular' o.pk %}?items_per_page={{ items_per_page }}&year={{ selected_year }}" class="text-decoration-none text-danger">
+                        <i class="bi {% if o.anulada %}bi-arrow-counterclockwise{% else %}bi-slash-circle{% endif %}"></i>
+                    </a>
+                </span>
                 {% endif %}
                 {% endif %}
                 {% if o.autor == user.username|slice:":10" %}
@@ -111,50 +126,40 @@
 {% if page_obj %}
 <nav aria-label="Page navigation">
     <ul class="pagination pagination-sm justify-content-center">
-        <!-- Primera página -->
         <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
-            <a class="page-link" href="?items_per_page={{ items_per_page }}&page=1" aria-label="Primera">
+            <a class="page-link" href="?year={{ selected_year }}&items_per_page={{ items_per_page }}&page=1" aria-label="Primera">
                 <span aria-hidden="true">««</span>
             </a>
         </li>
-        <!-- Página anterior -->
         <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
-            <a class="page-link" href="{% if page_obj.has_previous %}?items_per_page={{ items_per_page }}&page={{ page_obj.previous_page_number }}{% else %}#{% endif %}" aria-label="Anterior">
+            <a class="page-link" href="{% if page_obj.has_previous %}?year={{ selected_year }}&items_per_page={{ items_per_page }}&page={{ page_obj.previous_page_number }}{% else %}#{% endif %}" aria-label="Anterior">
                 <span aria-hidden="true">«</span>
             </a>
         </li>
-
         {% with page_range=page_obj.paginator.page_range current=page_obj.number total_pages=page_obj.paginator.num_pages %}
-        {% comment %} Simplificar el paginador para evitar el uso de add {% endcomment %}
         {% for num in page_range %}
         {% if num == 1 or num == total_pages or num == current or num == current|add:-1 or num == current|add:1 or num == current|add:-2 or num == current|add:2 %}
-            <!-- Mostrar la primera página, la última, la actual y las dos anteriores/siguientes -->
             <li class="page-item {% if page_obj.number == num %}active{% endif %}">
-                <a class="page-link" href="?items_per_page={{ items_per_page }}&page={{ num }}">{{ num }}</a>
+                <a class="page-link" href="?year={{ selected_year }}&items_per_page={{ items_per_page }}&page={{ num }}">{{ num }}</a>
             </li>
         {% elif num == 2 and current > 4 %}
-            <!-- Mostrar ellipsis antes del rango si hay un salto -->
             <li class="page-item disabled">
                 <span class="page-link">...</span>
             </li>
         {% elif num == total_pages|add:-1 and current < total_pages|add:-3 %}
-            <!-- Mostrar ellipsis después del rango si hay un salto -->
             <li class="page-item disabled">
                 <span class="page-link">...</span>
             </li>
         {% endif %}
         {% endfor %}
         {% endwith %}
-
-        <!-- Página siguiente -->
         <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
-            <a class="page-link" href="{% if page_obj.has_next %}?items_per_page={{ items_per_page }}&page={{ page_obj.next_page_number }}{% else %}#{% endif %}" aria-label="Siguiente">
+            <a class="page-link" href="{% if page_obj.has_next %}?year={{ selected_year }}&items_per_page={{ items_per_page }}&page={{ page_obj.next_page_number }}{% else %}#{% endif %}" aria-label="Siguiente">
                 <span aria-hidden="true">»</span>
             </a>
         </li>
-        <!-- Última página -->
         <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
-            <a class="page-link" href="?items_per_page={{ items_per_page }}&page={{ page_obj.paginator.num_pages }}" aria-label="Última">
+            <a class="page-link" href="?year={{ selected_year }}&items_per_page={{ items_per_page }}&page={{ page_obj.paginator.num_pages }}" aria-label="Última">
                 <span aria-hidden="true">»»</span>
             </a>
         </li>
@@ -182,8 +187,10 @@
                     {% endfor %}
                     {% endif %}
                     <div class="mb-3">
-                        <label for="fecha" class="form-label">Fecha</label>
-                        <input type="date" name="fecha" id="fecha" class="form-control" value="{% if form_data.fecha %}{{ form_data.fecha }}{% else %}{{ fecha_actual }}{% endif %}" required>
+                        <p class="mb-0">
+                            Fecha:<br>
+                            {{ fecha_actual_texto }}
+                        </p>
                     </div>
                     <div class="mb-3">
                         <label for="iddoc" class="form-label">IDDOC</label>
@@ -234,7 +241,7 @@
 <div class="modal fade" id="editarModal{{ o.numero }}" tabindex="-1" aria-labelledby="editarModalLabel{{ o.numero }}" aria-hidden="true" {% if show_edit_modal == o.numero %}data-bs-backdrop="static" data-bs-keyboard="false"{% endif %}>
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="post" action="{% url 'ordinarios_editar' o.pk %}?items_per_page={{ items_per_page }}&page={{ page_obj.number }}">
+            <form method="post" action="{% url 'ordinarios_editar' o.pk %}?items_per_page={{ items_per_page }}&page={{ page_obj.number }}&year={{ selected_year }}">
                 {% csrf_token %}
                 <div class="modal-header bg-primary text-white small">
                     <h5 class="modal-title" id="editarModalLabel{{ o.numero }}">Editar Ordinario {{ o.numero }}</h5>
@@ -250,8 +257,10 @@
                     {% endfor %}
                     {% endif %}
                     <div class="mb-3">
-                        <label for="fecha{{ o.numero }}" class="form-label">Fecha</label>
-                        <input type="date" name="fecha" id="fecha{{ o.numero }}" class="form-control" value="{% if form_data and form_data.fecha %}{{ form_data.fecha }}{% else %}{{ grupos_datos|lookup:o.numero|lookup:'fecha' }}{% endif %}" required>
+                        <p class="mb-0">
+                            Fecha:<br>
+                            {{ grupos_datos|lookup:o.numero|lookup:'fecha_texto' }}
+                        </p>
                     </div>
                     <div class="mb-3">
                         <label for="iddoc{{ o.numero }}" class="form-label">IDDOC</label>
@@ -335,7 +344,7 @@
 <div class="modal fade" id="eliminarModal{{ o.pk }}" tabindex="-1" aria-labelledby="eliminarModalLabel{{ o.pk }}" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="post" action="{% url 'ordinarios_eliminar' o.pk %}?items_per_page={{ items_per_page }}">
+            <form method="post" action="{% url 'ordinarios_eliminar' o.pk %}?items_per_page={{ items_per_page }}&year={{ selected_year }}">
                 {% csrf_token %}
                 <div class="modal-header bg-primary text-white small">
                     <h5 class="modal-title" id="eliminarModalLabel{{ o.pk }}">Eliminar Ordinario {{ o.numero }}</h5>
@@ -421,7 +430,6 @@ document.addEventListener('DOMContentLoaded', function() {
         margin: 0;
         padding: 0 2px;
     }
-    /* Estilos básicos para la tabla */
     .table.table-bordered {
         border-collapse: collapse;
     }
@@ -556,7 +564,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var removeButtons = editContainer.getElementsByClassName('remove-destinatario');
         Array.from(removeButtons).forEach(function(button) {
             button.addEventListener('click', function() {
-                console.log('Eliminando destinatario para ordinario {{ o.numero }}'); // Depuración
+                console.log('Eliminando destinatario para ordinario {{ o.numero }}');
                 var parent = this.parentElement;
                 if (parent) {
                     reindexDestinatarios('editar-destinatarios-container-{{ o.numero }}', 'edit_{{ o.numero }}');
